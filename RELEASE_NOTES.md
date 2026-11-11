@@ -1,25 +1,38 @@
-# Rewind v0.4 - Release Notes
+# Rewind v0.1 - Initial Release
 
-## What's New in v0.4
+High-precision, zero-latency instant replay buffer engineered for competitive gaming and clean system setups.
 
-### 🎨 Raycast Preferences Interface & Themes
-- Brand new two-column layout inspired by modern desktop tools.
-- Native Dark Mode and Light Mode support with real-time switching.
-- Windows 11 DWM title bar integration.
+---
+
+## ⚡ What's New in v0.1
+
+### 🚀 Ultra-Low Resource Engine
+- **< 0.5% CPU Overhead:** Hardware-accelerated NVIDIA NVENC video encoding on dedicated GPU silicon.
+- **Fixed ~80 MB RAM Ring Buffer:** Operates entirely in memory without disk thrashing or SSD wear.
+- **Pure Standalone Architecture:** Zero Electron, zero Chromium wrappers, zero background telemetry.
+
+### 🎨 Modern Minimalist Interface
+- Sleek Electric Violet / Cyber Purple accent theme.
+- Instant hot-toggle between deep Dark Mode and clean Light Mode.
+- Native Windows 11 DWM title bar and system tray integration.
 
 ### 🎧 Custom Audio Effects & Presets
-- Built-in procedural audio generator with 4 selectable sound profiles (Rewind, Shutter, Ding, Retro).
-- Support for custom user `.wav` and `.mp3` audio files.
-- Live audio preview button in audio preferences.
+- 4 procedural in-RAM sound presets (*Rewind, Shutter, Crystal Ding, 8-Bit Retro*).
+- Support for custom user `.wav` and `.mp3` audio files with instant live preview.
+- Studio-grade WASAPI 48kHz loopback mixer with independent microphone input.
 
-### 🔔 Gaming Overlay HUD
-- Non-activating notification toast displayed after saving a clip.
-- Direct file access button without stealing focus from full-screen games.
+### 🔔 Non-Activating Gaming HUD Overlay
+- Discreet notification toast displayed after saving a clip with duration and direct folder access.
+- Engineered with `WS_EX_NOACTIVATE` — never minimizes full-screen games or steals mouse/keyboard focus.
 
-### 🌐 Multi-Language Setup Wizard
-- Standalone installer `RewindSetup.exe` with on-the-fly language selection (English, Polish, German, Spanish, French, Ukrainian).
-- Automatic desktop shortcut creation and Start Menu search indexing.
+### 🌐 All-In-One Multi-Language Setup Wizard
+- Interactive installer with on-the-fly language switching (*English, Polski, Deutsch, Español, Français, Українська*).
+- Automatic desktop shortcuts, Windows Search indexing, and optional silent tray autostart.
 
-## Binaries
-- **Rewind.exe**: Standalone portable single-file executable.
-- **RewindSetup.exe**: Interactive setup installer.
+---
+
+## 📦 Downloads
+| Asset | Description |
+|---|---|
+| **`RewindSetup.exe`** | Recommended installer with multi-language setup and Start Menu integration. |
+| **`Rewind.exe`** | Standalone, portable single-executable (zero installation required). |

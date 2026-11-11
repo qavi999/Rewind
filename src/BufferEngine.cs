@@ -229,7 +229,7 @@ namespace ClipFlow {
                 } catch { }
 
                 string args = string.Format(
-                    "-y -nostats -loglevel error -f gdigrab -framerate {0} -draw_mouse {1} {2}-i desktop " +
+                    "-y -nostats -loglevel error -f gdigrab -framerate {0} -rtbufsize 256M -draw_mouse {1} {2}-i desktop " +
                     "{3} " +
                     "{4} " +
                     "{5} " +

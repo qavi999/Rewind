@@ -1482,7 +1482,7 @@ namespace ClipFlow {
 
             // Płynność (FPS)
             var fpsStack = new StackPanel { Orientation = Orientation.Horizontal };
-            int[] fpsList = new int[] { 30, 60 };
+            int[] fpsList = new int[] { 30, 60, 120, 144 };
             _fpsButtons.Clear();
             foreach (var f in fpsList) {
                 int fpsVal = f;

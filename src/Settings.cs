@@ -74,9 +74,13 @@ namespace ClipFlow {
         public bool ShowNotification { get; set; }
         public string PerformanceProfile { get; set; }
         public string Language { get; set; }
+        public int SelectedDisplayIndex { get; set; }
+        public string SelectedDisplayDevice { get; set; }
 
         public AppSettings() {
             Language = "pl";
+            SelectedDisplayIndex = 0;
+            SelectedDisplayDevice = "";
             ClipDuration = 30;
             Fps = 60;
             Bitrate = "12M";
@@ -147,6 +151,8 @@ namespace ClipFlow {
                         if (settings.SystemVolumePercent <= 0) settings.SystemVolumePercent = 100;
                         if (settings.MicVolumePercent <= 0) settings.MicVolumePercent = 100;
                         if (string.IsNullOrEmpty(settings.SelectedMicId)) settings.SelectedMicId = "default";
+                        if (settings.SelectedDisplayDevice == null) settings.SelectedDisplayDevice = "";
+                        if (settings.SelectedDisplayIndex < 0) settings.SelectedDisplayIndex = 0;
                         if (string.IsNullOrEmpty(settings.Theme)) settings.Theme = "Dark";
                         if (string.IsNullOrEmpty(settings.SoundPreset)) settings.SoundPreset = "Default";
                         if (settings.CustomSoundPath == null) settings.CustomSoundPath = "";

@@ -494,6 +494,7 @@ namespace ClipFlow {
         private TextBlock _emptyNotice;
 
         // Video Settings Controls
+        private TextBlock _screenDropdownText;
         private List<Button> _durationButtons = new List<Button>();
         private List<Button> _fpsButtons = new List<Button>();
         private List<Button> _bitrateButtons = new List<Button>();
@@ -1440,6 +1441,15 @@ namespace ClipFlow {
             var card = CreateSettingsCard();
             var cardStack = new StackPanel { Orientation = Orientation.Vertical };
 
+            // Wybór monitora / ekranu
+            var screenSelector = CreateRaycastScreenSelector();
+            cardStack.Children.Add(CreateRaycastSettingsRow(
+                _L.VideoScreenTitle,
+                _L.VideoScreenSub,
+                screenSelector
+            ));
+            cardStack.Children.Add(CreateRowDivider());
+
             // Długość bufora
             var durStack = new StackPanel { Orientation = Orientation.Horizontal };
             int[] durations = new int[] { 15, 30, 60, 120 };
@@ -2274,6 +2284,179 @@ namespace ClipFlow {
             if (_notifyIcon != null) {
                 _notifyIcon.Text = string.Format("Rewind - [{0}]", _settings.Hotkey);
             }
+        }
+
+        // ---------------------------------------------------------------------
+        // RAYCAST POPUP SCREEN / MONITOR SELECTOR
+        // ---------------------------------------------------------------------
+        private FrameworkElement CreateRaycastScreenSelector() {
+            var grid = new Grid();
+
+            var selectBtn = new Button {
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Height = 32,
+                MinWidth = 230,
+                Background = _theme.InputBg,
+                BorderBrush = _theme.InputBorder,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(12, 0, 10, 0),
+                HorizontalContentAlignment = HorizontalAlignment.Stretch
+            };
+            StyleModernButton(selectBtn, 10);
+
+            var btnContent = new Grid();
+            btnContent.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            btnContent.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            _screenDropdownText = new TextBlock {
+                Text = GetSelectedScreenFriendlyName(),
+                FontSize = 12,
+                Foreground = _theme.TextPrimary,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextTrimming = TextTrimming.CharacterEllipsis,
+                MaxWidth = 190
+            };
+            Grid.SetColumn(_screenDropdownText, 0);
+            btnContent.Children.Add(_screenDropdownText);
+
+            var chevron = new TextBlock {
+                Text = "▾",
+                FontSize = 12,
+                Foreground = _theme.TextSecondary,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0)
+            };
+            Grid.SetColumn(chevron, 1);
+            btnContent.Children.Add(chevron);
+
+            selectBtn.Content = btnContent;
+
+            var popup = new Popup {
+                PlacementTarget = selectBtn,
+                Placement = PlacementMode.Bottom,
+                StaysOpen = false,
+                AllowsTransparency = true,
+                PopupAnimation = PopupAnimation.Fade
+            };
+
+            var popupBorder = new Border {
+                Background = _theme.CardBg,
+                BorderBrush = _theme.CardBorder,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(12),
+                Padding = new Thickness(4),
+                Margin = new Thickness(0, 4, 0, 0),
+                MinWidth = 250
+            };
+
+            var itemsStack = new StackPanel { Orientation = Orientation.Vertical };
+
+            Action refreshItems = delegate {
+                itemsStack.Children.Clear();
+                var screens = System.Windows.Forms.Screen.AllScreens;
+
+                for (int i = 0; i < screens.Length; i++) {
+                    int index = i;
+                    var s = screens[i];
+                    bool isSelected = IsScreenSelected(s, index);
+
+                    var itemBtn = new Button {
+                        Cursor = System.Windows.Input.Cursors.Hand,
+                        Height = 32,
+                        Background = isSelected ? _theme.AccentCoralSoft : System.Windows.Media.Brushes.Transparent,
+                        BorderThickness = new Thickness(0),
+                        Padding = new Thickness(8, 0, 8, 0),
+                        HorizontalContentAlignment = HorizontalAlignment.Stretch
+                    };
+                    StyleModernButton(itemBtn, 8);
+
+                    var itemGrid = new Grid();
+                    itemGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(20) });
+                    itemGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                    var checkTb = new TextBlock {
+                        Text = isSelected ? "✓" : "",
+                        FontWeight = FontWeights.Bold,
+                        FontSize = 12,
+                        Foreground = _theme.AccentCoral,
+                        VerticalAlignment = VerticalAlignment.Center
+                    };
+                    Grid.SetColumn(checkTb, 0);
+                    itemGrid.Children.Add(checkTb);
+
+                    string screenLabel = FormatScreenLabel(s, index);
+                    var nameTb = new TextBlock {
+                        Text = screenLabel,
+                        FontSize = 12,
+                        Foreground = isSelected ? _theme.TextPrimary : _theme.TextSecondary,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        TextTrimming = TextTrimming.CharacterEllipsis
+                    };
+                    Grid.SetColumn(nameTb, 1);
+                    itemGrid.Children.Add(nameTb);
+
+                    itemBtn.Content = itemGrid;
+
+                    itemBtn.MouseEnter += delegate {
+                        itemBtn.Background = _theme.ButtonHoverBg;
+                        nameTb.Foreground = _theme.TextPrimary;
+                    };
+                    itemBtn.MouseLeave += delegate {
+                        itemBtn.Background = isSelected ? _theme.AccentCoralSoft : System.Windows.Media.Brushes.Transparent;
+                        nameTb.Foreground = isSelected ? _theme.TextPrimary : _theme.TextSecondary;
+                    };
+
+                    itemBtn.Click += delegate {
+                        _settings.SelectedDisplayIndex = index;
+                        _settings.SelectedDisplayDevice = s.DeviceName;
+                        _settings.Save();
+                        _screenDropdownText.Text = FormatScreenLabel(s, index);
+                        popup.IsOpen = false;
+                        RestartBufferWithNewSettings();
+                    };
+
+                    itemsStack.Children.Add(itemBtn);
+                }
+            };
+
+            selectBtn.Click += delegate {
+                refreshItems();
+                popup.IsOpen = !popup.IsOpen;
+            };
+
+            popupBorder.Child = itemsStack;
+            popup.Child = popupBorder;
+
+            grid.Children.Add(selectBtn);
+            grid.Children.Add(popup);
+            return grid;
+        }
+
+        private string FormatScreenLabel(System.Windows.Forms.Screen s, int index) {
+            string primaryBadge = s.Primary ? (" (" + _L.ScreenPrimaryBadge + ")") : "";
+            return string.Format("{0} {1}: {2}x{3}{4}", _L.ScreenLabel, index + 1, s.Bounds.Width, s.Bounds.Height, primaryBadge);
+        }
+
+        private string GetSelectedScreenFriendlyName() {
+            try {
+                var screens = System.Windows.Forms.Screen.AllScreens;
+                if (screens != null && screens.Length > 0) {
+                    for (int i = 0; i < screens.Length; i++) {
+                        if (IsScreenSelected(screens[i], i)) {
+                            return FormatScreenLabel(screens[i], i);
+                        }
+                    }
+                    return FormatScreenLabel(screens[0], 0);
+                }
+            } catch { }
+            return _L.ScreenPrimaryDefault;
+        }
+
+        private bool IsScreenSelected(System.Windows.Forms.Screen s, int index) {
+            if (!string.IsNullOrEmpty(_settings.SelectedDisplayDevice)) {
+                return string.Equals(s.DeviceName, _settings.SelectedDisplayDevice, StringComparison.OrdinalIgnoreCase);
+            }
+            return _settings.SelectedDisplayIndex == index || (s.Primary && _settings.SelectedDisplayIndex <= 0);
         }
 
         // ---------------------------------------------------------------------

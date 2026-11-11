@@ -31,6 +31,11 @@ namespace ClipFlow {
         public string ClipsCopyPath { get; set; }
 
         // Video Settings
+        public string VideoScreenTitle { get; set; }
+        public string VideoScreenSub { get; set; }
+        public string ScreenLabel { get; set; }
+        public string ScreenPrimaryBadge { get; set; }
+        public string ScreenPrimaryDefault { get; set; }
         public string VideoBufferTitle { get; set; }
         public string VideoBufferSub { get; set; }
         public string VideoDurationTitle { get; set; }
@@ -135,6 +140,12 @@ namespace ClipFlow {
                 ClipsDelete = "🗑 Usuń",
                 ClipsCopyPath = "📋 Kopiuj ścieżkę",
 
+                VideoScreenTitle = "Monitor do przechwytywania",
+                VideoScreenSub = "Wybierz ekran, z którego rejestrowane są powtórki.",
+                ScreenLabel = "Ekran",
+                ScreenPrimaryBadge = "Główny",
+                ScreenPrimaryDefault = "Główny monitor systemowy",
+
                 VideoBufferTitle = "Aktywny bufor w pamięci",
                 VideoBufferSub = "Ciągłe nagrywanie w RAM. Po wciśnięciu skrótu powtórka zapisuje się natychmiast.",
                 VideoDurationTitle = "Długość powtórki (bufor)",
@@ -228,6 +239,12 @@ namespace ClipFlow {
                 ClipsPlay = "▶ Play",
                 ClipsDelete = "🗑 Delete",
                 ClipsCopyPath = "📋 Copy Path",
+
+                VideoScreenTitle = "Display to Capture",
+                VideoScreenSub = "Select which monitor to record gameplay replays from.",
+                ScreenLabel = "Display",
+                ScreenPrimaryBadge = "Primary",
+                ScreenPrimaryDefault = "Primary System Display",
 
                 VideoBufferTitle = "Active in-memory buffer",
                 VideoBufferSub = "Continuous circular recording in RAM. Clips save instantly upon hotkey press.",
@@ -323,6 +340,12 @@ namespace ClipFlow {
                 ClipsDelete = "🗑 Löschen",
                 ClipsCopyPath = "📋 Pfad kopieren",
 
+                VideoScreenTitle = "Aufzunehmender Bildschirm",
+                VideoScreenSub = "Wählen Sie den Monitor für Spielaufnahmen aus.",
+                ScreenLabel = "Bildschirm",
+                ScreenPrimaryBadge = "Haupt",
+                ScreenPrimaryDefault = "Primärer Systembildschirm",
+
                 VideoBufferTitle = "Aktiver Speicherpuffer",
                 VideoBufferSub = "Kontinuierliche Aufzeichnung im RAM ohne Festplattenverschleiß.",
                 VideoDurationTitle = "Pufferdauer (Replay)",
@@ -416,6 +439,12 @@ namespace ClipFlow {
                 ClipsPlay = "▶ Reproducir",
                 ClipsDelete = "🗑 Eliminar",
                 ClipsCopyPath = "📋 Copiar ruta",
+
+                VideoScreenTitle = "Pantalla para capturar",
+                VideoScreenSub = "Selecciona qué monitor grabar en partidas.",
+                ScreenLabel = "Pantalla",
+                ScreenPrimaryBadge = "Principal",
+                ScreenPrimaryDefault = "Pantalla principal del sistema",
 
                 VideoBufferTitle = "Búfer activo en memoria",
                 VideoBufferSub = "Grabación circular en RAM. Los clips se guardan al instante.",
@@ -511,6 +540,12 @@ namespace ClipFlow {
                 ClipsDelete = "🗑 Supprimer",
                 ClipsCopyPath = "📋 Copier le chemin",
 
+                VideoScreenTitle = "Écran à capturer",
+                VideoScreenSub = "Sélectionnez le moniteur à enregistrer pour les replays.",
+                ScreenLabel = "Écran",
+                ScreenPrimaryBadge = "Principal",
+                ScreenPrimaryDefault = "Écran principal du système",
+
                 VideoBufferTitle = "Mémoire tampon active",
                 VideoBufferSub = "Enregistrement circulaire en RAM sans usure du disque.",
                 VideoDurationTitle = "Durée de rediffusion",
@@ -604,6 +639,12 @@ namespace ClipFlow {
                 ClipsPlay = "▶ Відтворити",
                 ClipsDelete = "🗑 Видалити",
                 ClipsCopyPath = "📋 Копіювати шлях",
+
+                VideoScreenTitle = "Екран для захоплення",
+                VideoScreenSub = "Оберіть монітор для запису ігрових повторів.",
+                ScreenLabel = "Екран",
+                ScreenPrimaryBadge = "Основний",
+                ScreenPrimaryDefault = "Головний системний монітор",
 
                 VideoBufferTitle = "Активний буфер у пам'яті",
                 VideoBufferSub = "Безперервний круговий запис у RAM без зношування SSD.",

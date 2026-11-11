@@ -1248,6 +1248,8 @@ namespace RewindInstaller {
                     dict["SystemVolumePercent"] = 100;
                     dict["MicVolumePercent"] = 100;
                     dict["SelectedMicId"] = "default";
+                    dict["SelectedDisplayIndex"] = 0;
+                    dict["SelectedDisplayDevice"] = "";
                     dict["CaptureCursor"] = false;
                     dict["Theme"] = "Dark";
                     dict["SoundPreset"] = "Default";

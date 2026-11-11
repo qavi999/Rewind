@@ -8,6 +8,7 @@ using System.Media;
 using System.Reflection;
 using System.Text;
 using System.Threading;
+using System.Windows.Forms;
 
 namespace ClipFlow {
     public class BufferEngine {
@@ -203,13 +204,37 @@ namespace ClipFlow {
                 }
 
                 int drawMouse = (_settings != null && _settings.CaptureCursor) ? 1 : 0;
+                string screenArgs = "";
+                try {
+                    var screens = Screen.AllScreens;
+                    if (screens != null && screens.Length > 0) {
+                        Screen targetScreen = null;
+                        if (!string.IsNullOrEmpty(_settings.SelectedDisplayDevice)) {
+                            targetScreen = screens.FirstOrDefault(s => string.Equals(s.DeviceName, _settings.SelectedDisplayDevice, StringComparison.OrdinalIgnoreCase));
+                        }
+                        if (targetScreen == null && _settings.SelectedDisplayIndex >= 0 && _settings.SelectedDisplayIndex < screens.Length) {
+                            targetScreen = screens[_settings.SelectedDisplayIndex];
+                        }
+                        if (targetScreen == null) {
+                            targetScreen = screens.FirstOrDefault(s => s.Primary) ?? screens[0];
+                        }
+                        if (targetScreen != null) {
+                            screenArgs = string.Format("-offset_x {0} -offset_y {1} -video_size {2}x{3} ",
+                                targetScreen.Bounds.X,
+                                targetScreen.Bounds.Y,
+                                targetScreen.Bounds.Width,
+                                targetScreen.Bounds.Height);
+                        }
+                    }
+                } catch { }
+
                 string args = string.Format(
-                    "-y -nostats -loglevel error -f gdigrab -framerate {0} -draw_mouse {1} -i desktop " +
-                    "{2} " +
+                    "-y -nostats -loglevel error -f gdigrab -framerate {0} -draw_mouse {1} {2}-i desktop " +
                     "{3} " +
                     "{4} " +
-                    "-g {0} -keyint_min {0} -f segment -segment_time {5} -segment_wrap {6} -reset_timestamps 1 \"{7}\"",
-                    fps, drawMouse, audioInput, encoderParams, audioCodec, segTime, wrapCount, segPattern
+                    "{5} " +
+                    "-g {0} -keyint_min {0} -f segment -segment_time {6} -segment_wrap {7} -reset_timestamps 1 \"{8}\"",
+                    fps, drawMouse, screenArgs, audioInput, encoderParams, audioCodec, segTime, wrapCount, segPattern
                 );
 
                 try {

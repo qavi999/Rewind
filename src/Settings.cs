@@ -93,16 +93,11 @@ namespace ClipFlow {
             MicVolumePercent = 100;
             SelectedMicId = "default";
 
-            string desktopClips = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "clipowanie", "clips");
-            if (Directory.Exists(desktopClips)) {
-                ClipsFolder = desktopClips;
-            } else {
-                string videosClips = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Rewind");
-                if (!Directory.Exists(videosClips)) {
-                    try { Directory.CreateDirectory(videosClips); } catch { }
-                }
-                ClipsFolder = videosClips;
+            string videosClips = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Rewind");
+            if (!Directory.Exists(videosClips)) {
+                try { Directory.CreateDirectory(videosClips); } catch { }
             }
+            ClipsFolder = videosClips;
         }
 
         public static string GetConfigPath() {

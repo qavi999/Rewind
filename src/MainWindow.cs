@@ -15,6 +15,7 @@ using System.Windows.Data;
 using System.Windows.Forms;
 using System.Windows.Input;
 using System.Windows.Interop;
+using System.Windows.Markup;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shell;
@@ -522,6 +523,7 @@ namespace ClipFlow {
             _theme = (_settings.Theme == "Light") ? ThemePalette.Light() : ThemePalette.Dark();
             SoundEffect.Configure(_settings);
 
+            ApplyModernScrollbarStyle(_theme.IsDark);
             InitWindow();
             BuildRaycastPreferencesLayout();
             InitTrayIcon();
@@ -555,8 +557,145 @@ namespace ClipFlow {
             if (_hwnd != IntPtr.Zero) {
                 NativeMethods.ApplyModernDwmAttributes(_hwnd, isDark);
             }
+            ApplyModernScrollbarStyle(isDark);
             BuildRaycastPreferencesLayout();
             SwitchCategory(_activeCategoryIndex);
+        }
+
+        private void ApplyModernScrollbarStyle(bool isDark) {
+            try {
+                string thumbColor = isDark ? "#3E3E44" : "#C8CAD2";
+                string hoverColor = isDark ? "#666672" : "#9EA0AC";
+                string dragColor = isDark ? "#8B5CF6" : "#7C3AED";
+
+                string xaml = string.Format(@"
+<ResourceDictionary xmlns=""http://schemas.microsoft.com/winfx/2006/xaml/presentation""
+                    xmlns:x=""http://schemas.microsoft.com/winfx/2006/xaml"">
+
+    <ControlTemplate x:Key=""VerticalScrollBarTemplate"" TargetType=""{{x:Type ScrollBar}}"">
+        <Grid x:Name=""Bg"" Background=""Transparent"" SnapsToDevicePixels=""true"">
+            <Track x:Name=""PART_Track"" IsDirectionReversed=""true"" HorizontalAlignment=""Center"">
+                <Track.DecreaseRepeatButton>
+                    <RepeatButton Command=""{{x:Static ScrollBar.PageUpCommand}}"" Focusable=""false"" Opacity=""0"">
+                        <RepeatButton.Template>
+                            <ControlTemplate TargetType=""{{x:Type RepeatButton}}"">
+                                <Rectangle Fill=""Transparent""/>
+                            </ControlTemplate>
+                        </RepeatButton.Template>
+                    </RepeatButton>
+                </Track.DecreaseRepeatButton>
+                <Track.IncreaseRepeatButton>
+                    <RepeatButton Command=""{{x:Static ScrollBar.PageDownCommand}}"" Focusable=""false"" Opacity=""0"">
+                        <RepeatButton.Template>
+                            <ControlTemplate TargetType=""{{x:Type RepeatButton}}"">
+                                <Rectangle Fill=""Transparent""/>
+                            </ControlTemplate>
+                        </RepeatButton.Template>
+                    </RepeatButton>
+                </Track.IncreaseRepeatButton>
+                <Track.Thumb>
+                    <Thumb>
+                        <Thumb.Template>
+                            <ControlTemplate TargetType=""{{x:Type Thumb}}"">
+                                <Border x:Name=""thumbBorder""
+                                        Width=""6""
+                                        CornerRadius=""3""
+                                        Margin=""1,2,1,2""
+                                        Opacity=""0.65""
+                                        Background=""{0}""/>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property=""IsMouseOver"" Value=""true"">
+                                        <Setter TargetName=""thumbBorder"" Property=""Opacity"" Value=""1.0""/>
+                                        <Setter TargetName=""thumbBorder"" Property=""Background"" Value=""{1}""/>
+                                    </Trigger>
+                                    <Trigger Property=""IsDragging"" Value=""true"">
+                                        <Setter TargetName=""thumbBorder"" Property=""Opacity"" Value=""1.0""/>
+                                        <Setter TargetName=""thumbBorder"" Property=""Background"" Value=""{2}""/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Thumb.Template>
+                    </Thumb>
+                </Track.Thumb>
+            </Track>
+        </Grid>
+    </ControlTemplate>
+
+    <ControlTemplate x:Key=""HorizontalScrollBarTemplate"" TargetType=""{{x:Type ScrollBar}}"">
+        <Grid x:Name=""Bg"" Background=""Transparent"" SnapsToDevicePixels=""true"">
+            <Track x:Name=""PART_Track"" IsDirectionReversed=""false"" VerticalAlignment=""Center"">
+                <Track.DecreaseRepeatButton>
+                    <RepeatButton Command=""{{x:Static ScrollBar.PageLeftCommand}}"" Focusable=""false"" Opacity=""0"">
+                        <RepeatButton.Template>
+                            <ControlTemplate TargetType=""{{x:Type RepeatButton}}"">
+                                <Rectangle Fill=""Transparent""/>
+                            </ControlTemplate>
+                        </RepeatButton.Template>
+                    </RepeatButton>
+                </Track.DecreaseRepeatButton>
+                <Track.IncreaseRepeatButton>
+                    <RepeatButton Command=""{{x:Static ScrollBar.PageRightCommand}}"" Focusable=""false"" Opacity=""0"">
+                        <RepeatButton.Template>
+                            <ControlTemplate TargetType=""{{x:Type RepeatButton}}"">
+                                <Rectangle Fill=""Transparent""/>
+                            </ControlTemplate>
+                        </RepeatButton.Template>
+                    </RepeatButton>
+                </Track.IncreaseRepeatButton>
+                <Track.Thumb>
+                    <Thumb>
+                        <Thumb.Template>
+                            <ControlTemplate TargetType=""{{x:Type Thumb}}"">
+                                <Border x:Name=""thumbBorder""
+                                        Height=""6""
+                                        CornerRadius=""3""
+                                        Margin=""2,1,2,1""
+                                        Opacity=""0.65""
+                                        Background=""{0}""/>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property=""IsMouseOver"" Value=""true"">
+                                        <Setter TargetName=""thumbBorder"" Property=""Opacity"" Value=""1.0""/>
+                                        <Setter TargetName=""thumbBorder"" Property=""Background"" Value=""{1}""/>
+                                    </Trigger>
+                                    <Trigger Property=""IsDragging"" Value=""true"">
+                                        <Setter TargetName=""thumbBorder"" Property=""Opacity"" Value=""1.0""/>
+                                        <Setter TargetName=""thumbBorder"" Property=""Background"" Value=""{2}""/>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Thumb.Template>
+                    </Thumb>
+                </Track.Thumb>
+            </Track>
+        </Grid>
+    </ControlTemplate>
+
+    <Style TargetType=""{{x:Type ScrollBar}}"">
+        <Setter Property=""Stylus.IsPressAndHoldEnabled"" Value=""false""/>
+        <Setter Property=""Stylus.IsFlicksEnabled"" Value=""false""/>
+        <Setter Property=""Background"" Value=""Transparent""/>
+        <Style.Triggers>
+            <Trigger Property=""Orientation"" Value=""Vertical"">
+                <Setter Property=""Width"" Value=""8""/>
+                <Setter Property=""MinWidth"" Value=""8""/>
+                <Setter Property=""Height"" Value=""Auto""/>
+                <Setter Property=""Template"" Value=""{{StaticResource VerticalScrollBarTemplate}}""/>
+            </Trigger>
+            <Trigger Property=""Orientation"" Value=""Horizontal"">
+                <Setter Property=""Width"" Value=""Auto""/>
+                <Setter Property=""Height"" Value=""8""/>
+                <Setter Property=""MinHeight"" Value=""8""/>
+                <Setter Property=""Template"" Value=""{{StaticResource HorizontalScrollBarTemplate}}""/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+</ResourceDictionary>", thumbColor, hoverColor, dragColor);
+
+                var rd = (ResourceDictionary)XamlReader.Parse(xaml);
+                this.Resources.MergedDictionaries.Clear();
+                this.Resources.MergedDictionaries.Add(rd);
+            } catch { }
         }
 
         public static void StyleModernButton(Button btn, double cornerRadius) {

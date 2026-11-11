@@ -109,6 +109,44 @@ namespace ClipFlow {
         public string HudOpenBtn { get; set; }
         public string BalloonTitle { get; set; }
         public string BalloonSub { get; set; }
+
+        // Additional UI & Details
+        public string ClipsRevealBtn { get; set; }
+        public string ClipsDeleteConfirm { get; set; }
+        public string ClipsDeleteTitle { get; set; }
+
+        public string SectionHeaderVideo { get; set; }
+        public string SectionHeaderVideoSub { get; set; }
+        public string SectionHeaderAudio { get; set; }
+        public string SectionHeaderAudioSub { get; set; }
+        public string SectionHeaderHotkeys { get; set; }
+        public string SectionHeaderHotkeysSub { get; set; }
+        public string SectionHeaderSystem { get; set; }
+        public string SectionHeaderSystemSub { get; set; }
+
+        public string VideoGpuTitle { get; set; }
+        public string VideoGpuSub { get; set; }
+        public string HotkeyGlobalTitle { get; set; }
+        public string HotkeyGlobalSub { get; set; }
+        public string HotkeyBadgeText { get; set; }
+        public string SystemBufferActivityTitle { get; set; }
+        public string SystemBufferActivitySub { get; set; }
+
+        public string AudioMicDefault { get; set; }
+        public string SoundPresetDefault { get; set; }
+        public string SoundPresetShutter { get; set; }
+        public string SoundPresetDing { get; set; }
+        public string SoundPresetRetro { get; set; }
+        public string SoundPresetCustom { get; set; }
+        public string SoundCustomEmpty { get; set; }
+
+        public string ToastClipSaved { get; set; }
+        public string ToastPlayNow { get; set; }
+        public string TooltipLightMode { get; set; }
+        public string TooltipDarkMode { get; set; }
+        public string TooltipMinimize { get; set; }
+        public string TooltipClose { get; set; }
+        public string FooterEscHint { get; set; }
     }
 
     public static class AppLocalization {
@@ -212,7 +250,44 @@ namespace ClipFlow {
                 HudSubtitle = "Powtórka gotowa w folderze klipów.",
                 HudOpenBtn = "Otwórz folder",
                 BalloonTitle = "Rewind gotowy w zasobniku",
-                BalloonSub = "Bufor powtórek aktywny w tle. Wciśnij {0}, aby zapisać klip."
+                BalloonSub = "Bufor powtórek aktywny w tle. Wciśnij {0}, aby zapisać klip.",
+
+                ClipsRevealBtn = "Folder",
+                ClipsDeleteConfirm = "Czy na pewno chcesz usunąć klip {0}?",
+                ClipsDeleteTitle = "Usuń klip",
+
+                SectionHeaderVideo = "Wideo i bufor powtórek",
+                SectionHeaderVideoSub = "Skonfiguruj ekran, długość powtórki, klatkaż oraz sprzętowy enkoder GPU.",
+                SectionHeaderAudio = "Dźwięk i mikser audio",
+                SectionHeaderAudioSub = "Konfiguracja nagrywania dźwięku z gry, mikrofonu oraz personalizacja dźwięku powtórki.",
+                SectionHeaderHotkeys = "Skróty klawiszowe",
+                SectionHeaderHotkeysSub = "Globalne klawisze wyzwalające natychmiastowe przechwycenie powtórki.",
+                SectionHeaderSystem = "System, wygląd i powiadomienia",
+                SectionHeaderSystemSub = "Personalizacja wyglądu aplikacji, powiadomień HUD oraz autostartu z Windows.",
+
+                VideoGpuTitle = "Sprzętowa akceleracja kodowania",
+                VideoGpuSub = "Koder GPU odciąża procesor CPU do < 0.5%, gwarantując zero spadków FPS w grach.",
+                HotkeyGlobalTitle = "Tryb globalnego nasłuchu",
+                HotkeyGlobalSub = "Skrót jest rejestrowany na poziomie systemu Windows za pośrednictwem RegisterHotKey.",
+                HotkeyBadgeText = "✓ Działa w każdej grze pełnoekranowej",
+                SystemBufferActivityTitle = "Aktywność bufora w tle",
+                SystemBufferActivitySub = "Możesz tymczasowo zatrzymać koder wideo, gdy nie planujesz zapisywać żadnych powtórek.",
+
+                AudioMicDefault = "Domyślny mikrofon systemowy",
+                SoundPresetDefault = "Rewind",
+                SoundPresetShutter = "Migawka",
+                SoundPresetDing = "Dzwonek",
+                SoundPresetRetro = "Retro 8-bit",
+                SoundPresetCustom = "Własny plik",
+                SoundCustomEmpty = "Brak wybranego pliku",
+
+                ToastClipSaved = "🎬 Klip został pomyślnie zapisany!",
+                ToastPlayNow = "Odtwórz teraz",
+                TooltipLightMode = "Przełącz na tryb jasny",
+                TooltipDarkMode = "Przełącz na tryb ciemny",
+                TooltipMinimize = "Zminimalizuj do zasobnika",
+                TooltipClose = "Schowaj do zasobnika",
+                FooterEscHint = "Wciśnij [Esc], aby schować do traya"
             };
 
             // 2. English
@@ -312,7 +387,44 @@ namespace ClipFlow {
                 HudSubtitle = "Replay is ready in your clips folder.",
                 HudOpenBtn = "Open Folder",
                 BalloonTitle = "Rewind active in system tray",
-                BalloonSub = "Replay buffer running in background. Press {0} to save a clip."
+                BalloonSub = "Replay buffer running in background. Press {0} to save a clip.",
+
+                ClipsRevealBtn = "Folder",
+                ClipsDeleteConfirm = "Are you sure you want to delete clip {0}?",
+                ClipsDeleteTitle = "Delete Clip",
+
+                SectionHeaderVideo = "Video & Buffer Settings",
+                SectionHeaderVideoSub = "Configure display, replay length, framerate, and GPU hardware encoder.",
+                SectionHeaderAudio = "Audio & Mixer Settings",
+                SectionHeaderAudioSub = "Configure game audio loopback, microphone input, and replay sound effects.",
+                SectionHeaderHotkeys = "Hotkeys & Shortcuts",
+                SectionHeaderHotkeysSub = "Global key combinations to trigger instant replay clips.",
+                SectionHeaderSystem = "System, Appearance & Startup",
+                SectionHeaderSystemSub = "Customize theme appearance, gaming HUD toast, and Windows autostart.",
+
+                VideoGpuTitle = "Hardware-accelerated encoding",
+                VideoGpuSub = "GPU encoder offloads the CPU to < 0.5%, ensuring zero in-game FPS drops.",
+                HotkeyGlobalTitle = "Global hook mode",
+                HotkeyGlobalSub = "Shortcut is registered system-wide across all full-screen applications.",
+                HotkeyBadgeText = "✓ Active in all fullscreen games",
+                SystemBufferActivityTitle = "Background buffer state",
+                SystemBufferActivitySub = "Temporarily pause video capture when you do not intend to record clips.",
+
+                AudioMicDefault = "Default system microphone",
+                SoundPresetDefault = "Rewind",
+                SoundPresetShutter = "Shutter",
+                SoundPresetDing = "Chime",
+                SoundPresetRetro = "Retro 8-bit",
+                SoundPresetCustom = "Custom file",
+                SoundCustomEmpty = "No file selected",
+
+                ToastClipSaved = "🎬 Replay clip saved successfully!",
+                ToastPlayNow = "Play now",
+                TooltipLightMode = "Switch to Light Mode",
+                TooltipDarkMode = "Switch to Dark Mode",
+                TooltipMinimize = "Minimize to tray",
+                TooltipClose = "Hide to tray",
+                FooterEscHint = "Press [Esc] to minimize to tray"
             };
 
             // 3. Deutsch
@@ -412,7 +524,44 @@ namespace ClipFlow {
                 HudSubtitle = "Replay im Ordner verfügbar.",
                 HudOpenBtn = "Ordner öffnen",
                 BalloonTitle = "Rewind im Infobereich bereit",
-                BalloonSub = "Puffer aktiv. Drücken Sie {0}, um einen Clip zu speichern."
+                BalloonSub = "Puffer aktiv. Drücken Sie {0}, um einen Clip zu speichern.",
+
+                ClipsRevealBtn = "Ordner",
+                ClipsDeleteConfirm = "Möchten Sie den Clip {0} wirklich löschen?",
+                ClipsDeleteTitle = "Clip löschen",
+
+                SectionHeaderVideo = "Video & Puffer-Einstellungen",
+                SectionHeaderVideoSub = "Konfigurieren Sie Bildschirm, Pufferdauer, Bildrate und GPU-Encoder.",
+                SectionHeaderAudio = "Audio & Mixer-Einstellungen",
+                SectionHeaderAudioSub = "Spielsound, Mikrofoneingang und Bestätigungstöne einrichten.",
+                SectionHeaderHotkeys = "Tastatur-Hotkeys",
+                SectionHeaderHotkeysSub = "Globale Tasten zum sofortigen Auslösen von Replays.",
+                SectionHeaderSystem = "System, Design & Autostart",
+                SectionHeaderSystemSub = "Erscheinungsbild, HUD-Overlay und Windows-Autostart anpassen.",
+
+                VideoGpuTitle = "Hardwarebeschleunigte Codierung",
+                VideoGpuSub = "Der GPU-Encoder entlastet die CPU auf < 0.5% für ruckelfreies Gaming.",
+                HotkeyGlobalTitle = "Globaler Tastatur-Hook",
+                HotkeyGlobalSub = "Der Hotkey ist systemweit in allen Vollbildanwendungen registriert.",
+                HotkeyBadgeText = "✓ Funktioniert in allen Vollbildspielen",
+                SystemBufferActivityTitle = "Puffer-Hintergrundaktivität",
+                SystemBufferActivitySub = "Pausieren Sie den Video-Encoder, wenn keine Aufnahmen benötigt werden.",
+
+                AudioMicDefault = "Standard-Systemmikrofon",
+                SoundPresetDefault = "Rewind",
+                SoundPresetShutter = "Verschluss",
+                SoundPresetDing = "Glocke",
+                SoundPresetRetro = "Retro 8-Bit",
+                SoundPresetCustom = "Eigene Datei",
+                SoundCustomEmpty = "Keine Datei ausgewählt",
+
+                ToastClipSaved = "🎬 Clip erfolgreich gespeichert!",
+                ToastPlayNow = "Jetzt abspielen",
+                TooltipLightMode = "Zu hellem Modus wechseln",
+                TooltipDarkMode = "Zu dunklem Modus wechseln",
+                TooltipMinimize = "In den Infobereich minimieren",
+                TooltipClose = "In den Infobereich ausblenden",
+                FooterEscHint = "Drücken Sie [Esc], um ins Tray zu minimieren"
             };
 
             // 4. Español
@@ -512,7 +661,44 @@ namespace ClipFlow {
                 HudSubtitle = "Repetición lista en la carpeta de clips.",
                 HudOpenBtn = "Abrir carpeta",
                 BalloonTitle = "Rewind listo en la bandeja",
-                BalloonSub = "Búfer activo. Presiona {0} para guardar una repetición."
+                BalloonSub = "Búfer activo. Presiona {0} para guardar una repetición.",
+
+                ClipsRevealBtn = "Carpeta",
+                ClipsDeleteConfirm = "¿Seguro que quieres eliminar el clip {0}?",
+                ClipsDeleteTitle = "Eliminar clip",
+
+                SectionHeaderVideo = "Ajustes de vídeo y búfer",
+                SectionHeaderVideoSub = "Configura pantalla, duración, fotogramas y codificador GPU.",
+                SectionHeaderAudio = "Ajustes de audio y mezclador",
+                SectionHeaderAudioSub = "Configura el sonido del juego, micrófono y avisos acústicos.",
+                SectionHeaderHotkeys = "Atajos de teclado",
+                SectionHeaderHotkeysSub = "Combinaciones globales para capturar clips al instante.",
+                SectionHeaderSystem = "Sistema, apariencia e inicio",
+                SectionHeaderSystemSub = "Personaliza el tema, aviso HUD e inicio automático con Windows.",
+
+                VideoGpuTitle = "Aceleración de codificación por hardware",
+                VideoGpuSub = "El codificador GPU reduce la carga de CPU a < 0.5% sin caídas de FPS.",
+                HotkeyGlobalTitle = "Modo de captura global",
+                HotkeyGlobalSub = "El atajo está registrado a nivel del sistema para todos los juegos.",
+                HotkeyBadgeText = "✓ Funciona en cualquier juego a pantalla completa",
+                SystemBufferActivityTitle = "Actividad del búfer en segundo plano",
+                SystemBufferActivitySub = "Pausa temporalmente el codificador de vídeo cuando no desees grabar.",
+
+                AudioMicDefault = "Micrófono predeterminado del sistema",
+                SoundPresetDefault = "Rewind",
+                SoundPresetShutter = "Obturador",
+                SoundPresetDing = "Campana",
+                SoundPresetRetro = "Retro 8-bit",
+                SoundPresetCustom = "Archivo propio",
+                SoundCustomEmpty = "Ningún archivo seleccionado",
+
+                ToastClipSaved = "🎬 ¡Clip guardado con éxito!",
+                ToastPlayNow = "Reproducir ahora",
+                TooltipLightMode = "Cambiar a modo claro",
+                TooltipDarkMode = "Cambiar a modo oscuro",
+                TooltipMinimize = "Minimizar a la bandeja",
+                TooltipClose = "Ocultar en la bandeja",
+                FooterEscHint = "Presiona [Esc] para ocultar en la bandeja"
             };
 
             // 5. Français
@@ -612,7 +798,44 @@ namespace ClipFlow {
                 HudSubtitle = "Rediffusion disponible dans le dossier.",
                 HudOpenBtn = "Ouvrir le dossier",
                 BalloonTitle = "Rewind actif dans la barre des tâches",
-                BalloonSub = "Mémoire active. Appuyez sur {0} pour enregistrer un clip."
+                BalloonSub = "Mémoire active. Appuyez sur {0} pour enregistrer un clip.",
+
+                ClipsRevealBtn = "Dossier",
+                ClipsDeleteConfirm = "Voulez-vous vraiment supprimer le clip {0} ?",
+                ClipsDeleteTitle = "Supprimer le clip",
+
+                SectionHeaderVideo = "Paramètres vidéo et tampon",
+                SectionHeaderVideoSub = "Configurez l'écran, la durée, le débit et l'encodeur GPU.",
+                SectionHeaderAudio = "Paramètres audio et mixeur",
+                SectionHeaderAudioSub = "Configurez le son du jeu, l'entrée micro et les signaux sonores.",
+                SectionHeaderHotkeys = "Raccourcis clavier",
+                SectionHeaderHotkeysSub = "Combinaisons globales pour déclencher des replays instantanés.",
+                SectionHeaderSystem = "Système, apparence et démarrage",
+                SectionHeaderSystemSub = "Personnalisez le thème, l'overlay HUD et le démarrage avec Windows.",
+
+                VideoGpuTitle = "Accélération matérielle de l'encodage",
+                VideoGpuSub = "L'encodeur GPU soulage le processeur à < 0.5% sans perte de FPS.",
+                HotkeyGlobalTitle = "Mode de capture global",
+                HotkeyGlobalSub = "Le raccourci est enregistré au niveau du système pour tous les jeux.",
+                HotkeyBadgeText = "✓ Fonctionne dans tous les jeux plein écran",
+                SystemBufferActivityTitle = "Activité du tampon en arrière-plan",
+                SystemBufferActivitySub = "Mettez en pause l'encodeur vidéo lorsque vous n'enregistrez pas.",
+
+                AudioMicDefault = "Microphone système par défaut",
+                SoundPresetDefault = "Rewind",
+                SoundPresetShutter = "Obturateur",
+                SoundPresetDing = "Cloche",
+                SoundPresetRetro = "Rétro 8-bit",
+                SoundPresetCustom = "Fichier personnalisé",
+                SoundCustomEmpty = "Aucun fichier sélectionné",
+
+                ToastClipSaved = "🎬 Clip sauvegardé avec succès !",
+                ToastPlayNow = "Lire maintenant",
+                TooltipLightMode = "Passer au thème clair",
+                TooltipDarkMode = "Passer au thème sombre",
+                TooltipMinimize = "Réduire dans la zone de notification",
+                TooltipClose = "Masquer dans la zone de notification",
+                FooterEscHint = "Appuyez sur [Échap] pour masquer dans la zone de notification"
             };
 
             // 6. Українська
@@ -712,7 +935,44 @@ namespace ClipFlow {
                 HudSubtitle = "Повтор готовий у папці з кліпами.",
                 HudOpenBtn = "Відкрити папку",
                 BalloonTitle = "Rewind активний у системному треї",
-                BalloonSub = "Буфер працює у фоні. Натисніть {0}, щоб зберегти кліп."
+                BalloonSub = "Буфер працює у фоні. Натисніть {0}, щоб зберегти кліп.",
+
+                ClipsRevealBtn = "Папка",
+                ClipsDeleteConfirm = "Ви дійсно бажаєте видалити кліп {0}?",
+                ClipsDeleteTitle = "Видалити кліп",
+
+                SectionHeaderVideo = "Відео та параметри буфера",
+                SectionHeaderVideoSub = "Налаштуйте екран, тривалість, частоту кадрів та GPU-кодер.",
+                SectionHeaderAudio = "Аудіо та мікшер",
+                SectionHeaderAudioSub = "Налаштування звуку гри, мікрофона та звукового підтвердження.",
+                SectionHeaderHotkeys = "Гарячі клавіші",
+                SectionHeaderHotkeysSub = "Глобальні клавіші для миттєвого збереження повторів.",
+                SectionHeaderSystem = "Система, вигляд та автозапуск",
+                SectionHeaderSystemSub = "Персоналізація теми, HUD-сповіщень та автозапуску з Windows.",
+
+                VideoGpuTitle = "Апаратне прискорення кодування",
+                VideoGpuSub = "GPU-кодер зменшує навантаження на процесор до < 0.5%, гарантуючи стабільний FPS.",
+                HotkeyGlobalTitle = "Режим глобального перехоплення",
+                HotkeyGlobalSub = "Комбінація реєструється в системі для всіх повноекранних ігор.",
+                HotkeyBadgeText = "✓ Працює у будь-якій повноекранній грі",
+                SystemBufferActivityTitle = "Активність фонового буфера",
+                SystemBufferActivitySub = "Ви можете тимчасово зупинити відеокодер, коли не плануєте записувати повтори.",
+
+                AudioMicDefault = "Головний системний мікрофон",
+                SoundPresetDefault = "Rewind",
+                SoundPresetShutter = "Затвор",
+                SoundPresetDing = "Дзвіночок",
+                SoundPresetRetro = "Ретро 8-біт",
+                SoundPresetCustom = "Власний файл",
+                SoundCustomEmpty = "Файл не обрано",
+
+                ToastClipSaved = "🎬 Кліп успішно збережено!",
+                ToastPlayNow = "Відтворити зараз",
+                TooltipLightMode = "Перемкнути на світлу тему",
+                TooltipDarkMode = "Перемкнути на темну тему",
+                TooltipMinimize = "Згорнути в трей",
+                TooltipClose = "Сховати в трей",
+                FooterEscHint = "Натисніть [Esc], щоб сховати в трей"
             };
         }
 

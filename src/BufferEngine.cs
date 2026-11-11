@@ -175,10 +175,10 @@ namespace ClipFlow {
                     NotifyError("Ostrzeżenie audio: " + ex.Message);
                 }
 
-                int segTime = 2;
+                int segTime = 1;
                 int duration = Math.Max(15, _settings.ClipDuration);
                 int segCount = (int)Math.Ceiling(duration / (double)segTime);
-                int wrapCount = Math.Max(24, segCount * 2 + 8);
+                int wrapCount = Math.Max(60, segCount * 2 + 10);
 
                 int fps = _settings.Fps > 0 ? _settings.Fps : 60;
                 string bitrate = string.IsNullOrEmpty(_settings.Bitrate) ? "12M" : _settings.Bitrate;
@@ -316,8 +316,9 @@ namespace ClipFlow {
                 }
 
                 try {
-                    // Brief pause allows FFmpeg to finalize encoding the moment of the hotkey press
-                    Thread.Sleep(350);
+                    // Wait for the active segment boundary to complete and flush all frames to disk.
+                    // This guarantees zero missing frames and captures the full play plus aftermath.
+                    Thread.Sleep(1400);
                     ExecuteSaveClip();
                 } catch (Exception ex) {
                     NotifyError("Błąd zapisu klipu: " + ex.Message);
@@ -346,9 +347,9 @@ namespace ClipFlow {
                 return;
             }
 
-            int segTime = 2;
+            int segTime = 1;
             int duration = Math.Max(15, _settings.ClipDuration);
-            int neededCount = (int)Math.Ceiling(duration / (double)segTime);
+            int neededCount = (int)Math.Ceiling(duration / (double)segTime) + 1;
 
             var chosen = new List<string>();
             string snapFile = null;

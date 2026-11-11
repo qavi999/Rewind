@@ -1090,13 +1090,6 @@ namespace ClipFlow {
 
             var captionButtons = new StackPanel { Orientation = Orientation.Horizontal };
 
-            // Quick Theme Switcher Button
-            var themeBtn = CreateWindowsCaptionButton(_theme.IsDark ? "☀️" : "🌙", _theme.IsDark ? _L.TooltipLightMode : _L.TooltipDarkMode, false);
-            themeBtn.Click += delegate {
-                ApplyTheme(!_theme.IsDark);
-            };
-            captionButtons.Children.Add(themeBtn);
-
             var minBtn = CreateWindowsCaptionButton("—", _L.TooltipMinimize, false);
             minBtn.Click += delegate {
                 WindowState = WindowState.Minimized;

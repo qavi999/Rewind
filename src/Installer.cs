@@ -107,7 +107,6 @@ namespace RewindInstaller {
         private TextBlock _titleTb;
         private TextBlock _headerTitle;
         private TextBlock _headerSubtitle;
-        private TextBlock _langBtnText;
         private TextBlock _langLabel;
         private Dictionary<string, Button> _inCardLangButtons = new Dictionary<string, Button>();
         private TextBox _pathBox;
@@ -445,7 +444,6 @@ namespace RewindInstaller {
             if (_titleTb != null) _titleTb.Text = _isUninstall ? _s.TitleUninstall : _s.TitleSetup;
             if (_headerTitle != null) _headerTitle.Text = _isUninstall ? _s.HeaderUninstallTitle : _s.HeaderInstallTitle;
             if (_headerSubtitle != null) _headerSubtitle.Text = _isUninstall ? _s.HeaderUninstallSub : _s.HeaderInstallSub;
-            if (_langBtnText != null) _langBtnText.Text = _s.Flag + " " + _s.LangName + " ▾";
             if (_langLabel != null) _langLabel.Text = _s.LangLabel;
             if (_inCardLangButtons != null) {
                 foreach (var kvp in _inCardLangButtons) {
@@ -611,10 +609,6 @@ namespace RewindInstaller {
 
             var titleRightStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
 
-            // Language Selector Button
-            var langSelector = CreateLanguageSelector();
-            titleRightStack.Children.Add(langSelector);
-
             var closeBtn = new Button {
                 Width = 44,
                 Height = 44,
@@ -755,106 +749,6 @@ namespace RewindInstaller {
             footerBorder.Child = footerGrid;
             Grid.SetRow(footerBorder, 3);
             rootGrid.Children.Add(footerBorder);
-        }
-
-        private FrameworkElement CreateLanguageSelector() {
-            var grid = new Grid { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
-
-            var langBtn = new Button {
-                Height = 26,
-                Background = new SolidColorBrush(Color.FromRgb(24, 24, 24)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(44, 44, 44)),
-                BorderThickness = new Thickness(1),
-                Cursor = System.Windows.Input.Cursors.Hand,
-                Padding = new Thickness(8, 0, 8, 0),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            StyleModernButton(langBtn, 7);
-            WindowChrome.SetIsHitTestVisibleInChrome(langBtn, true);
-
-            _langBtnText = new TextBlock {
-                Text = _s.Flag + " " + _s.LangName + " ▾",
-                FontSize = 11.5,
-                FontWeight = FontWeights.Medium,
-                Foreground = new SolidColorBrush(Color.FromRgb(215, 215, 215)),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            langBtn.Content = _langBtnText;
-
-            var popup = new Popup {
-                PlacementTarget = langBtn,
-                Placement = PlacementMode.Bottom,
-                StaysOpen = false,
-                AllowsTransparency = true,
-                PopupAnimation = PopupAnimation.Fade
-            };
-
-            var popupBorder = new Border {
-                Background = new SolidColorBrush(Color.FromRgb(18, 18, 18)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(46, 46, 46)),
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(10),
-                Padding = new Thickness(4),
-                Margin = new Thickness(0, 4, 0, 0),
-                MinWidth = 145
-            };
-
-            var itemsStack = new StackPanel { Orientation = Orientation.Vertical };
-
-            Action refreshItems = delegate {
-                itemsStack.Children.Clear();
-                foreach (var kvp in _languages) {
-                    string code = kvp.Key;
-                    var langData = kvp.Value;
-                    bool isSelected = (code == _currentLang);
-
-                    var itemBtn = new Button {
-                        Cursor = System.Windows.Input.Cursors.Hand,
-                        Height = 28,
-                        Background = isSelected ? new SolidColorBrush(Color.FromArgb(40, 139, 92, 246)) : System.Windows.Media.Brushes.Transparent,
-                        BorderThickness = new Thickness(0),
-                        Padding = new Thickness(8, 0, 8, 0),
-                        HorizontalContentAlignment = HorizontalAlignment.Left
-                    };
-                    StyleModernButton(itemBtn, 6);
-
-                    var itemText = new TextBlock {
-                        Text = langData.Flag + "  " + langData.LangName,
-                        FontSize = 11.5,
-                        Foreground = isSelected ? new SolidColorBrush(Color.FromRgb(196, 181, 253)) : new SolidColorBrush(Color.FromRgb(220, 220, 220)),
-                        VerticalAlignment = VerticalAlignment.Center
-                    };
-                    itemBtn.Content = itemText;
-
-                    itemBtn.MouseEnter += delegate {
-                        itemBtn.Background = new SolidColorBrush(Color.FromRgb(34, 34, 34));
-                        itemText.Foreground = System.Windows.Media.Brushes.White;
-                    };
-                    itemBtn.MouseLeave += delegate {
-                        itemBtn.Background = (code == _currentLang) ? new SolidColorBrush(Color.FromArgb(40, 139, 92, 246)) : System.Windows.Media.Brushes.Transparent;
-                        itemText.Foreground = (code == _currentLang) ? new SolidColorBrush(Color.FromRgb(196, 181, 253)) : new SolidColorBrush(Color.FromRgb(220, 220, 220));
-                    };
-
-                    itemBtn.Click += delegate {
-                        popup.IsOpen = false;
-                        SetLanguage(code);
-                    };
-
-                    itemsStack.Children.Add(itemBtn);
-                }
-            };
-
-            langBtn.Click += delegate {
-                refreshItems();
-                popup.IsOpen = !popup.IsOpen;
-            };
-
-            popupBorder.Child = itemsStack;
-            popup.Child = popupBorder;
-
-            grid.Children.Add(langBtn);
-            grid.Children.Add(popup);
-            return grid;
         }
 
         private void BuildViews() {

@@ -54,6 +54,7 @@ namespace RewindInstaller {
     public class InstallerStrings {
         public string LangName { get; set; }
         public string Flag { get; set; }
+        public string LangLabel { get; set; }
         public string TitleSetup { get; set; }
         public string TitleUninstall { get; set; }
         public string HeaderInstallTitle { get; set; }
@@ -107,6 +108,8 @@ namespace RewindInstaller {
         private TextBlock _headerTitle;
         private TextBlock _headerSubtitle;
         private TextBlock _langBtnText;
+        private TextBlock _langLabel;
+        private Dictionary<string, Button> _inCardLangButtons = new Dictionary<string, Button>();
         private TextBox _pathBox;
         private TextBlock _pathLabel;
         private Button _browseBtn;
@@ -154,6 +157,7 @@ namespace RewindInstaller {
             _languages["pl"] = new InstallerStrings {
                 LangName = "Polski",
                 Flag = "🇵🇱",
+                LangLabel = "Język aplikacji:",
                 TitleSetup = "Instalator Rewind v0.1",
                 TitleUninstall = "Dezinstalacja Rewind",
                 HeaderInstallTitle = "Instalacja programu Rewind",
@@ -198,6 +202,7 @@ namespace RewindInstaller {
             _languages["en"] = new InstallerStrings {
                 LangName = "English",
                 Flag = "🇬🇧",
+                LangLabel = "Application language:",
                 TitleSetup = "Rewind Setup v0.1",
                 TitleUninstall = "Uninstall Rewind",
                 HeaderInstallTitle = "Install Rewind",
@@ -242,6 +247,7 @@ namespace RewindInstaller {
             _languages["de"] = new InstallerStrings {
                 LangName = "Deutsch",
                 Flag = "🇩🇪",
+                LangLabel = "Anwendungssprache:",
                 TitleSetup = "Rewind Setup v0.1",
                 TitleUninstall = "Rewind deinstallieren",
                 HeaderInstallTitle = "Rewind Installation",
@@ -286,6 +292,7 @@ namespace RewindInstaller {
             _languages["es"] = new InstallerStrings {
                 LangName = "Español",
                 Flag = "🇪🇸",
+                LangLabel = "Idioma de la aplicación:",
                 TitleSetup = "Instalador de Rewind v0.1",
                 TitleUninstall = "Desinstalar Rewind",
                 HeaderInstallTitle = "Instalar Rewind",
@@ -330,6 +337,7 @@ namespace RewindInstaller {
             _languages["fr"] = new InstallerStrings {
                 LangName = "Français",
                 Flag = "🇫🇷",
+                LangLabel = "Langue de l'application :",
                 TitleSetup = "Installation de Rewind v0.1",
                 TitleUninstall = "Désinstaller Rewind",
                 HeaderInstallTitle = "Installer Rewind",
@@ -374,6 +382,7 @@ namespace RewindInstaller {
             _languages["ua"] = new InstallerStrings {
                 LangName = "Українська",
                 Flag = "🇺🇦",
+                LangLabel = "Мова програми:",
                 TitleSetup = "Встановлення Rewind v0.1",
                 TitleUninstall = "Видалення Rewind",
                 HeaderInstallTitle = "Встановлення Rewind",
@@ -437,6 +446,12 @@ namespace RewindInstaller {
             if (_headerTitle != null) _headerTitle.Text = _isUninstall ? _s.HeaderUninstallTitle : _s.HeaderInstallTitle;
             if (_headerSubtitle != null) _headerSubtitle.Text = _isUninstall ? _s.HeaderUninstallSub : _s.HeaderInstallSub;
             if (_langBtnText != null) _langBtnText.Text = _s.Flag + " " + _s.LangName + " ▾";
+            if (_langLabel != null) _langLabel.Text = _s.LangLabel;
+            if (_inCardLangButtons != null) {
+                foreach (var kvp in _inCardLangButtons) {
+                    UpdateSegmentLangButton(kvp.Value, kvp.Key == code);
+                }
+            }
 
             if (_pathLabel != null) _pathLabel.Text = _s.PathLabel;
             if (_browseBtn != null) _browseBtn.Content = _s.BrowseBtn;
@@ -463,7 +478,7 @@ namespace RewindInstaller {
         private void InitWindow() {
             Title = _isUninstall ? _s.TitleUninstall : _s.TitleSetup;
             Width = 560;
-            Height = 460;
+            Height = 525;
             WindowStartupLocation = WindowStartupLocation.CenterScreen;
             ResizeMode = ResizeMode.NoResize;
             Background = new SolidColorBrush(Color.FromRgb(10, 10, 10)); // Pitch Black
@@ -502,6 +517,39 @@ namespace RewindInstaller {
             borderFef.AppendChild(cpFef);
             template.VisualTree = borderFef;
             btn.Template = template;
+        }
+
+        private Button CreateSegmentLangButton(string text, bool isSelected) {
+            var btn = new Button {
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Height = 26,
+                Background = isSelected ? new SolidColorBrush(Color.FromArgb(48, 139, 92, 246)) : new SolidColorBrush(Color.FromRgb(24, 24, 24)),
+                BorderBrush = isSelected ? new SolidColorBrush(Color.FromRgb(139, 92, 246)) : new SolidColorBrush(Color.FromRgb(44, 44, 44)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(8, 0, 8, 0),
+                Margin = new Thickness(0, 0, 6, 6)
+            };
+            StyleModernButton(btn, 7);
+            var tb = new TextBlock {
+                Text = text,
+                FontSize = 11,
+                FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Normal,
+                Foreground = isSelected ? new SolidColorBrush(Color.FromRgb(216, 180, 254)) : new SolidColorBrush(Color.FromRgb(200, 200, 200)),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            btn.Content = tb;
+            return btn;
+        }
+
+        private void UpdateSegmentLangButton(Button btn, bool isSelected) {
+            if (btn == null) return;
+            btn.Background = isSelected ? new SolidColorBrush(Color.FromArgb(48, 139, 92, 246)) : new SolidColorBrush(Color.FromRgb(24, 24, 24));
+            btn.BorderBrush = isSelected ? new SolidColorBrush(Color.FromRgb(139, 92, 246)) : new SolidColorBrush(Color.FromRgb(44, 44, 44));
+            var tb = btn.Content as TextBlock;
+            if (tb != null) {
+                tb.FontWeight = isSelected ? FontWeights.SemiBold : FontWeights.Normal;
+                tb.Foreground = isSelected ? new SolidColorBrush(Color.FromRgb(216, 180, 254)) : new SolidColorBrush(Color.FromRgb(200, 200, 200));
+            }
         }
 
         private static ImageSource LoadAppIconImage() {
@@ -825,6 +873,36 @@ namespace RewindInstaller {
             var cardStack = new StackPanel { Orientation = Orientation.Vertical };
 
             if (!_isUninstall) {
+                // Language selection
+                _langLabel = new TextBlock {
+                    Text = _s.LangLabel,
+                    FontSize = 12,
+                    FontWeight = FontWeights.Medium,
+                    Foreground = System.Windows.Media.Brushes.White,
+                    Margin = new Thickness(0, 0, 0, 6)
+                };
+                cardStack.Children.Add(_langLabel);
+
+                var langWrap = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+                _inCardLangButtons.Clear();
+                foreach (var kvp in _languages) {
+                    string code = kvp.Key;
+                    var langData = kvp.Value;
+                    bool isSel = (code == _currentLang);
+                    var btn = CreateSegmentLangButton(langData.Flag + " " + langData.LangName, isSel);
+                    btn.Click += delegate { SetLanguage(code); };
+                    _inCardLangButtons[code] = btn;
+                    langWrap.Children.Add(btn);
+                }
+                cardStack.Children.Add(langWrap);
+
+                // Divider
+                cardStack.Children.Add(new Border {
+                    Height = 1,
+                    Background = new SolidColorBrush(Color.FromRgb(28, 28, 28)),
+                    Margin = new Thickness(0, 4, 0, 10)
+                });
+
                 // Folder path row
                 var pathRow = new Grid();
                 pathRow.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });

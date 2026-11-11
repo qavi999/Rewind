@@ -515,7 +515,6 @@ namespace ClipFlow {
         private Button _toggleBufferBtn;
         private ThemePalette _theme;
         private UiStrings _L;
-        private List<Button> _langButtons = new List<Button>();
 
         public MainWindow(AppSettings settings, BufferEngine engine) {
             _settings = settings;
@@ -1969,25 +1968,6 @@ namespace ClipFlow {
             // 1. Karta wyglądu i nakładki HUD
             var themeCard = CreateSettingsCard();
             var themeCardStack = new StackPanel { Orientation = Orientation.Vertical };
-
-            // Wybór języka aplikacji
-            var langBtnStack = new WrapPanel { Orientation = Orientation.Horizontal };
-            _langButtons.Clear();
-            foreach (var kvp in AppLocalization.AvailableLanguages) {
-                string langCode = kvp.Key;
-                string langLabel = kvp.Value;
-                bool isSel = string.Equals(_settings.Language, langCode, StringComparison.OrdinalIgnoreCase);
-                var btn = CreateSegmentButton(langLabel, isSel);
-                btn.Click += delegate { SwitchLanguage(langCode); };
-                _langButtons.Add(btn);
-                langBtnStack.Children.Add(btn);
-            }
-            themeCardStack.Children.Add(CreateRaycastSettingsRow(
-                _L.SystemLangTitle,
-                _L.SystemLangSub,
-                langBtnStack
-            ));
-            themeCardStack.Children.Add(CreateRowDivider());
 
             // Motyw aplikacji (Ciemny / Jasny)
             var themeBtnStack = new StackPanel { Orientation = Orientation.Horizontal };

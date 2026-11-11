@@ -676,6 +676,22 @@ namespace RewindInstaller {
             };
             StyleModernButton(_actionBtn, 12);
             _actionBtn.Click += delegate {
+                if (_isCompleted) {
+                    if (!_isUninstall && _cbLaunchNow != null && _cbLaunchNow.IsChecked == true) {
+                        try {
+                            string destExe = Path.Combine(_targetDir, "Rewind.exe");
+                            if (File.Exists(destExe)) {
+                                Process.Start(new ProcessStartInfo(destExe) {
+                                    WorkingDirectory = _targetDir,
+                                    UseShellExecute = true
+                                });
+                            }
+                        } catch { }
+                    }
+                    Close();
+                    return;
+                }
+
                 if (_isUninstall) {
                     RunUninstallation();
                 } else {
@@ -1109,13 +1125,7 @@ namespace RewindInstaller {
                     NotifyShell();
 
                     UpdateProgress(100, _s.ProgressDoneInstall);
-                    Thread.Sleep(400);
-
-                    if (launchNow) {
-                        try {
-                            Process.Start(new ProcessStartInfo(destExe) { WorkingDirectory = _targetDir });
-                        } catch { }
-                    }
+                    Thread.Sleep(300);
 
                     Dispatcher.Invoke(new Action(delegate {
                         _isCompleted = true;
@@ -1123,7 +1133,6 @@ namespace RewindInstaller {
                         _finishPanel.Visibility = Visibility.Visible;
                         _actionBtn.IsEnabled = true;
                         _actionBtn.Content = _s.ActionFinish;
-                        _actionBtn.Click += delegate { Close(); };
                     }));
                 } catch (Exception ex) {
                     Dispatcher.Invoke(new Action(delegate {
@@ -1181,7 +1190,6 @@ namespace RewindInstaller {
                         _finishPanel.Visibility = Visibility.Visible;
                         _actionBtn.IsEnabled = true;
                         _actionBtn.Content = _s.ActionClose;
-                        _actionBtn.Click += delegate { Close(); };
                     }));
                 } catch (Exception ex) {
                     Dispatcher.Invoke(new Action(delegate {

@@ -24,6 +24,10 @@ namespace ClipFlow {
                 SetCurrentProcessExplicitAppUserModelID("Rewind.App");
             } catch { }
 
+            try {
+                System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+            } catch { }
+
             bool isNewInstance;
             _singleInstanceMutex = new Mutex(true, "Global\\Rewind_SingleInstance_App", out isNewInstance);
 

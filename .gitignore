@@ -1,0 +1,49 @@
+# ==============================================================================
+# Rewind - Git Ignore Configuration
+# ==============================================================================
+
+# Compiled binaries and builds
+builds/
+bin/
+obj/
+*.exe
+*.dll
+*.pdb
+*.msi
+
+# Allow source icon & compressed core tool
+!src/app.ico
+!tools/ffmpeg.gz
+!src/clip.wav
+
+# User recordings & video clips
+clips/
+*.mp4
+*.mkv
+*.mov
+*.m4a
+*.lnk
+
+# Settings and user data
+rewind_settings.json
+settings.json
+
+# Scratch scripts and temporary execution logs
+scratch/
+*.tmp
+*.log
+*.bak
+
+# IDE & Editor files
+.vs/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Windows OS specific files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/

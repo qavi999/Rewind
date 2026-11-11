@@ -31,8 +31,7 @@ High-precision, zero-latency instant replay buffer engineered for competitive ga
 
 ---
 
-## 📦 Downloads
+## 📦 Download
 | Asset | Description |
 |---|---|
-| **`RewindSetup.exe`** | Recommended installer with multi-language setup and Start Menu integration. |
-| **`Rewind.exe`** | Standalone, portable single-executable (zero installation required). |
+| **`RewindSetup.exe`** | Dedicated installer with multi-language setup, desktop shortcuts, and Start Menu integration. |

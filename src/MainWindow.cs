@@ -299,20 +299,20 @@ namespace ClipFlow {
         private static HudNotificationWindow _currentInstance;
         private System.Windows.Threading.DispatcherTimer _timer;
 
-        public static void ShowToast(string fileName, int duration, string clipPath, ThemePalette theme) {
+        public static void ShowToast(string fileName, int duration, string clipPath, ThemePalette theme, UiStrings strings = null) {
             try {
                 if (_currentInstance != null) {
                     try { _currentInstance.Close(); } catch { }
                     _currentInstance = null;
                 }
 
-                var hud = new HudNotificationWindow(fileName, duration, clipPath, theme);
+                var hud = new HudNotificationWindow(fileName, duration, clipPath, theme, strings);
                 _currentInstance = hud;
                 hud.Show();
             } catch { }
         }
 
-        public HudNotificationWindow(string fileName, int duration, string clipPath, ThemePalette theme) {
+        public HudNotificationWindow(string fileName, int duration, string clipPath, ThemePalette theme, UiStrings strings = null) {
             WindowStyle = WindowStyle.None;
             AllowsTransparency = true;
             Topmost = true;
@@ -375,8 +375,11 @@ namespace ClipFlow {
                 Margin = new Thickness(10, 0, 10, 0)
             };
 
+            string titleFormat = strings != null ? strings.HudTitleFormat : "Klip powtórki zapisany! ({0}s)";
+            string openText = strings != null ? strings.HudOpenBtn : "Otwórz";
+
             var titleTb = new TextBlock {
-                Text = string.Format("Klip powtórki zapisany! ({0}s)", duration),
+                Text = string.Format(titleFormat, duration),
                 FontSize = 12.5,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = isDark ? System.Windows.Media.Brushes.White : new SolidColorBrush(Color.FromRgb(20, 20, 24))
@@ -396,7 +399,7 @@ namespace ClipFlow {
             grid.Children.Add(textStack);
 
             var openBtn = new Button {
-                Content = "Otwórz",
+                Content = openText,
                 Cursor = System.Windows.Input.Cursors.Hand,
                 FontSize = 11,
                 FontWeight = FontWeights.SemiBold,
@@ -509,10 +512,13 @@ namespace ClipFlow {
         private List<Button> _themeButtons = new List<Button>();
         private Button _toggleBufferBtn;
         private ThemePalette _theme;
+        private UiStrings _L;
+        private List<Button> _langButtons = new List<Button>();
 
         public MainWindow(AppSettings settings, BufferEngine engine) {
             _settings = settings;
             _engine = engine;
+            _L = AppLocalization.Get(_settings.Language);
             _theme = (_settings.Theme == "Light") ? ThemePalette.Light() : ThemePalette.Dark();
             SoundEffect.Configure(_settings);
 
@@ -523,6 +529,21 @@ namespace ClipFlow {
 
             Closing += OnWindowClosing;
             KeyDown += OnWindowKeyDown;
+        }
+
+        public void SwitchLanguage(string langCode) {
+            _settings.Language = langCode;
+            _settings.Save();
+            _L = AppLocalization.Get(langCode);
+
+            BuildRaycastPreferencesLayout();
+            SwitchCategory(_activeCategoryIndex);
+            InitTrayIcon();
+            UpdateHeroTitle();
+            if (_sidebarStatusText != null) {
+                _sidebarStatusText.Text = _engine.IsRecording ? _L.SidebarStatusActive : _L.SidebarStatusPaused;
+            }
+            RefreshClipsList();
         }
 
         public void ApplyTheme(bool isDark) {
@@ -742,12 +763,12 @@ namespace ClipFlow {
 
             var navStack = new StackPanel { Orientation = Orientation.Vertical };
             string[] navLabels = new string[] {
-                "🎬  Moje powtórki",
-                "📹  Wideo i bufor",
-                "🎧  Dźwięk i mikser",
-                "⌨️  Skróty klawiszowe",
-                "⚙️  System i autostart",
-                "ℹ️  O programie"
+                _L.NavClips,
+                _L.NavVideo,
+                _L.NavAudio,
+                _L.NavHotkeys,
+                _L.NavSystem,
+                _L.NavAbout
             };
 
             _navButtons.Clear();
@@ -784,7 +805,7 @@ namespace ClipFlow {
                 VerticalAlignment = VerticalAlignment.Center
             };
             _sidebarStatusText = new TextBlock {
-                Text = "Bufor aktywny (NVENC)",
+                Text = _settings.BufferActive ? _L.SidebarStatusActive : _L.SidebarStatusPaused,
                 FontSize = 11,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = _theme.StatusBadgeFg,
@@ -795,7 +816,7 @@ namespace ClipFlow {
             footerStack.Children.Add(statusRow);
 
             _sidebarInfoSubtext = new TextBlock {
-                Text = string.Format("Skrót: [{0}] • Bufor: {1}s", _settings.Hotkey, _settings.ClipDuration),
+                Text = string.Format(_L.SidebarInfoFormat, _settings.Hotkey, _settings.ClipDuration),
                 FontSize = 10,
                 Foreground = _theme.TextSecondary,
                 Margin = new Thickness(13, 3, 0, 0)
@@ -1097,7 +1118,7 @@ namespace ClipFlow {
                 Margin = new Thickness(0, 0, 0, 6)
             };
             _heroHotkeyBadge = new TextBlock {
-                Text = "SKRÓT: " + _settings.Hotkey,
+                Text = _L.HeroHotkeyPrefix + _settings.Hotkey,
                 FontSize = 10.5,
                 FontWeight = FontWeights.Bold,
                 Foreground = _theme.IsDark ? new SolidColorBrush(Color.FromRgb(216, 180, 254)) : _theme.AccentCoral
@@ -1106,7 +1127,7 @@ namespace ClipFlow {
             leftStack.Children.Add(hotkeyPill);
 
             _heroTitle = new TextBlock {
-                Text = string.Format("Zapisz ostatnie {0} sekund", _settings.ClipDuration),
+                Text = string.Format(_L.HeroTitleFormat, _settings.ClipDuration),
                 FontSize = 17,
                 FontWeight = FontWeights.Bold,
                 Foreground = _theme.TextPrimary,
@@ -1115,7 +1136,7 @@ namespace ClipFlow {
             leftStack.Children.Add(_heroTitle);
 
             var descText = new TextBlock {
-                Text = "Wciśnij klawisz skrótu w dowolnej grze lub na pulpicie. Nagrywanie z dźwiękiem działa w tle.",
+                Text = _L.HeroSubtitle,
                 FontSize = 12,
                 Foreground = _theme.TextSecondary
             };
@@ -1142,7 +1163,7 @@ namespace ClipFlow {
             StyleModernButton(_heroClipBtn, 14); // Rounded button pill
 
             var btnBorder = new Border {
-                Child = new TextBlock { Text = string.Format("⚡ Zapisz klip ({0})", _settings.Hotkey) }
+                Child = new TextBlock { Text = _L.HeroButton }
             };
             _heroClipBtn.Content = btnBorder;
             _heroClipBtn.Click += delegate {
@@ -1214,7 +1235,7 @@ namespace ClipFlow {
 
             var titleStack = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             var title = new TextBlock {
-                Text = "ZAPISANE POWTÓRKI",
+                Text = _L.ClipsTitle.ToUpperInvariant(),
                 FontSize = 11,
                 FontWeight = FontWeights.Bold,
                 Foreground = _theme.TextSecondary
@@ -1239,7 +1260,7 @@ namespace ClipFlow {
                 Foreground = _theme.TextPrimary,
                 FontSize = 11.5,
                 BorderThickness = new Thickness(0),
-                Content = "📂 Otwórz folder z klipami"
+                Content = _L.ClipsOpenFolder
             };
             StyleModernButton(openFolderBtn, 8);
             openFolderBtn.Click += delegate { OpenClipsFolder(); };
@@ -1249,7 +1270,7 @@ namespace ClipFlow {
             sectionStack.Children.Add(headerGrid);
 
             _emptyNotice = new TextBlock {
-                Text = "Brak nagranych klipów. Wciśnij F8 w dowolnym momencie, aby zapisać powtórkę!",
+                Text = string.Format(_L.ClipsEmpty, _settings.Hotkey),
                 FontSize = 12,
                 Foreground = _theme.TextMuted,
                 Margin = new Thickness(0, 16, 0, 16),
@@ -1298,8 +1319,8 @@ namespace ClipFlow {
                 durStack.Children.Add(btn);
             }
             cardStack.Children.Add(CreateRaycastSettingsRow(
-                "Długość bufora powtórki",
-                "Czas nagrania zapisywany w tył w momencie naciśnięcia klawisza skrótu.",
+                _L.VideoDurationTitle,
+                _L.VideoDurationSub,
                 durStack
             ));
             cardStack.Children.Add(CreateRowDivider());
@@ -1321,8 +1342,8 @@ namespace ClipFlow {
                 fpsStack.Children.Add(btn);
             }
             cardStack.Children.Add(CreateRaycastSettingsRow(
-                "Płynność nagrywania (FPS)",
-                "60 FPS zapewnia idealną płynność gier; 30 FPS zmniejsza zużycie pamięci.",
+                _L.VideoFpsTitle,
+                _L.VideoFpsSub,
                 fpsStack
             ));
             cardStack.Children.Add(CreateRowDivider());
@@ -1344,8 +1365,8 @@ namespace ClipFlow {
                 bitStack.Children.Add(btn);
             }
             cardStack.Children.Add(CreateRaycastSettingsRow(
-                "Jakość i bitrate wideo",
-                "12 Mbps to optymalny balans pomiędzy wysoką wyrazistością a rozmiarem pliku.",
+                _L.VideoBitrateTitle,
+                _L.VideoBitrateSub,
                 bitStack
             ));
             cardStack.Children.Add(CreateRowDivider());
@@ -1358,8 +1379,8 @@ namespace ClipFlow {
                 RestartBufferWithNewSettings();
             };
             cardStack.Children.Add(CreateRaycastSettingsRow(
-                "Przechwytywanie kursora myszy",
-                "Wyłączone zapobiega migotaniu kursora w systemie Windows (Zalecane: Wyłączone).",
+                _L.VideoCursorTitle,
+                _L.VideoCursorSub,
                 cursorToggle
             ));
 
@@ -1414,12 +1435,12 @@ namespace ClipFlow {
                 FontSize = 11.5,
                 Padding = new Thickness(12, 5, 12, 5),
                 Margin = new Thickness(0, 0, 6, 0),
-                Content = "Zmień"
+                Content = _L.VideoFolderBtn
             };
             StyleModernButton(changeFolderBtn, 10);
             changeFolderBtn.Click += delegate {
                 var fbd = new FolderBrowserDialog {
-                    Description = "Wybierz folder do zapisywania klipów:",
+                    Description = _L.VideoFolderSub,
                     SelectedPath = _settings.ClipsFolder
                 };
                 if (fbd.ShowDialog() == System.Windows.Forms.DialogResult.OK) {
@@ -1446,8 +1467,8 @@ namespace ClipFlow {
             folderControls.Children.Add(openFldBtn);
 
             card2Stack.Children.Add(CreateRaycastSettingsRow(
-                "Katalog zapisu powtórek",
-                "Folder, do którego trafiają wygenerowane pliki MP4.",
+                _L.VideoFolderTitle,
+                _L.VideoFolderSub,
                 folderControls
             ));
 
@@ -1478,8 +1499,8 @@ namespace ClipFlow {
             // Mikrofon
             var micSelector = CreateRaycastMicSelector();
             cardStack.Children.Add(CreateRaycastSettingsRow(
-                "Wejście mikrofonu",
-                "Wybierz urządzenie nagrywające Twój głos lub wyłącz rejestrację mikrofonu.",
+                _L.AudioMicDeviceTitle,
+                _L.AudioMicDeviceSub,
                 micSelector
             ));
             cardStack.Children.Add(CreateRowDivider());
@@ -1518,8 +1539,8 @@ namespace ClipFlow {
             sysVolBox.Children.Add(_sysVolLabel);
 
             cardStack.Children.Add(CreateRaycastSettingsRow(
-                "Głośność multimediów / gry",
-                "Poziom dźwięku przechwytywanego z gry, Discorda oraz systemu Windows.",
+                _L.AudioSysVolTitle,
+                _L.AudioSysVolSub,
                 sysVolBox
             ));
             cardStack.Children.Add(CreateRowDivider());
@@ -1558,8 +1579,8 @@ namespace ClipFlow {
             micVolBox.Children.Add(_micVolLabel);
 
             cardStack.Children.Add(CreateRaycastSettingsRow(
-                "Głośność mikrofonu",
-                "Niezależny poziom czułości mikrofonu w zmiksowanym klipie wideo.",
+                _L.AudioMicVolTitle,
+                _L.AudioMicVolSub,
                 micVolBox
             ));
 
@@ -1577,8 +1598,8 @@ namespace ClipFlow {
                 _settings.Save();
             };
             soundStack.Children.Add(CreateRaycastSettingsRow(
-                "Odtwarzaj dźwięk powtórki",
-                "Potwierdzenie dźwiękowe po naciśnięciu skrótu zapisu klipu.",
+                _L.AudioPlaySoundTitle,
+                _L.AudioPlaySoundSub,
                 soundToggle
             ));
             soundStack.Children.Add(CreateRowDivider());
@@ -1595,13 +1616,13 @@ namespace ClipFlow {
 
             var presetText = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
             presetText.Children.Add(new TextBlock {
-                Text = "Profil dźwiękowy powtórki",
+                Text = _L.AudioPresetTitle,
                 FontSize = 13,
                 FontWeight = FontWeights.Medium,
                 Foreground = _theme.TextPrimary
             });
             presetText.Children.Add(new TextBlock {
-                Text = "Wybierz wbudowany dźwięk generowany w RAM lub wskaż własny plik.",
+                Text = _L.AudioPresetSub,
                 FontSize = 11,
                 Foreground = _theme.TextSecondary,
                 Margin = new Thickness(0, 2, 0, 0)
@@ -1618,7 +1639,7 @@ namespace ClipFlow {
                 FontSize = 11.5,
                 FontWeight = FontWeights.SemiBold,
                 Padding = new Thickness(14, 5, 14, 5),
-                Content = "▶ Testuj dźwięk",
+                Content = _L.AudioTestBtn,
                 VerticalAlignment = VerticalAlignment.Center
             };
             StyleModernButton(testSoundBtn, 10);
@@ -1678,13 +1699,13 @@ namespace ClipFlow {
                 Foreground = _theme.TextPrimary,
                 FontSize = 11.5,
                 Padding = new Thickness(14, 5, 14, 5),
-                Content = "Wybierz plik..."
+                Content = _L.AudioCustomBtn
             };
             StyleModernButton(pickSoundBtn, 10);
             pickSoundBtn.Click += delegate {
                 var ofd = new OpenFileDialog {
-                    Title = "Wybierz własny dźwięk zapisu klipu",
-                    Filter = "Pliki audio (*.wav;*.mp3)|*.wav;*.mp3|Wszystkie pliki (*.*)|*.*"
+                    Title = _L.AudioCustomTitle,
+                    Filter = "Audio Files (*.wav;*.mp3)|*.wav;*.mp3|All Files (*.*)|*.*"
                 };
                 if (ofd.ShowDialog() == System.Windows.Forms.DialogResult.OK) {
                     _settings.CustomSoundPath = ofd.FileName;
@@ -1699,8 +1720,8 @@ namespace ClipFlow {
             customFileRow.Children.Add(pickSoundBtn);
 
             soundStack.Children.Add(CreateRaycastSettingsRow(
-                "Własny plik audio (.wav, .mp3)",
-                "Użyj dowolnego ulubionego pliku audio z dysku (aktywne z profilem 'Własny plik').",
+                _L.AudioCustomTitle,
+                _L.AudioCustomSub,
                 customFileRow
             ));
 
@@ -1744,8 +1765,8 @@ namespace ClipFlow {
                 hkStack.Children.Add(btn);
             }
             cardStack.Children.Add(CreateRaycastSettingsRow(
-                "Globalny skrót zapisu powtórki",
-                "Klawisz wyzwalający natychmiastowe pobranie ostatnich sekund w grach i na pulpicie.",
+                _L.HotkeyTitle,
+                _L.HotkeySub,
                 hkStack
             ));
             cardStack.Children.Add(CreateRowDivider());
@@ -1794,23 +1815,42 @@ namespace ClipFlow {
             var themeCard = CreateSettingsCard();
             var themeCardStack = new StackPanel { Orientation = Orientation.Vertical };
 
+            // Wybór języka aplikacji
+            var langBtnStack = new WrapPanel { Orientation = Orientation.Horizontal };
+            _langButtons.Clear();
+            foreach (var kvp in AppLocalization.AvailableLanguages) {
+                string langCode = kvp.Key;
+                string langLabel = kvp.Value;
+                bool isSel = string.Equals(_settings.Language, langCode, StringComparison.OrdinalIgnoreCase);
+                var btn = CreateSegmentButton(langLabel, isSel);
+                btn.Click += delegate { SwitchLanguage(langCode); };
+                _langButtons.Add(btn);
+                langBtnStack.Children.Add(btn);
+            }
+            themeCardStack.Children.Add(CreateRaycastSettingsRow(
+                _L.SystemLangTitle,
+                _L.SystemLangSub,
+                langBtnStack
+            ));
+            themeCardStack.Children.Add(CreateRowDivider());
+
             // Motyw aplikacji (Ciemny / Jasny)
             var themeBtnStack = new StackPanel { Orientation = Orientation.Horizontal };
             _themeButtons.Clear();
 
-            var darkBtn = CreateSegmentButton("🌙 Ciemny (Dark)", _theme.IsDark);
+            var darkBtn = CreateSegmentButton("🌙 Dark", _theme.IsDark);
             darkBtn.Click += delegate { ApplyTheme(true); };
             _themeButtons.Add(darkBtn);
             themeBtnStack.Children.Add(darkBtn);
 
-            var lightBtn = CreateSegmentButton("☀️ Jasny (Light)", !_theme.IsDark);
+            var lightBtn = CreateSegmentButton("☀️ Light", !_theme.IsDark);
             lightBtn.Click += delegate { ApplyTheme(false); };
             _themeButtons.Add(lightBtn);
             themeBtnStack.Children.Add(lightBtn);
 
             themeCardStack.Children.Add(CreateRaycastSettingsRow(
-                "Motyw kolorystyczny interfejsu",
-                "Wybierz pomiędzy głęboką czernią Raycast a nowoczesnym trybem jasnym.",
+                _L.SystemThemeTitle,
+                _L.SystemThemeSub,
                 themeBtnStack
             ));
             themeCardStack.Children.Add(CreateRowDivider());
@@ -1822,8 +1862,8 @@ namespace ClipFlow {
                 _settings.Save();
             };
             themeCardStack.Children.Add(CreateRaycastSettingsRow(
-                "Dyskretne powiadomienie HUD w grach",
-                "Pływający komunikat w rogu ekranu po zapisaniu powtórki (nie minimalizuje gier).",
+                _L.SystemHudTitle,
+                _L.SystemHudSub,
                 hudToggle
             ));
 
@@ -1842,8 +1882,8 @@ namespace ClipFlow {
                 _settings.Save();
             };
             cardStack.Children.Add(CreateRaycastSettingsRow(
-                "Uruchamiaj z systemem Windows (Autostart)",
-                "Automatycznie włącza Rewind w tle po uruchomieniu komputera.",
+                _L.SystemAutostartTitle,
+                _L.SystemAutostartSub,
                 autostartToggle
             ));
             cardStack.Children.Add(CreateRowDivider());
@@ -1855,8 +1895,8 @@ namespace ClipFlow {
                 _settings.Save();
             };
             cardStack.Children.Add(CreateRaycastSettingsRow(
-                "Uruchamiaj zminimalizowany w zasobniku (tray)",
-                "Dyskretne działanie w tle od momentu włączenia komputera bez otwierania głównego okna.",
+                _L.SystemStartMinTitle,
+                _L.SystemStartMinSub,
                 startMinToggle
             ));
             cardStack.Children.Add(CreateRowDivider());
@@ -1904,35 +1944,35 @@ namespace ClipFlow {
             };
 
             var rootStack = new StackPanel { Orientation = Orientation.Vertical };
-            rootStack.Children.Add(CreateSettingsSectionHeader("O programie Rewind", "Specyfikacja techniczna i wskaźniki wydajności silnika powtórek."));
+            rootStack.Children.Add(CreateSettingsSectionHeader(_L.NavAbout, _L.AboutVersionSub));
 
             var card = CreateSettingsCard();
             var cardStack = new StackPanel { Orientation = Orientation.Vertical };
 
             cardStack.Children.Add(CreateRaycastSettingsRow(
-                "Wersja aplikacji",
-                "Samodzielny plik all-in-one bez żadnych zewnętrznych zależności.",
+                _L.AboutVersionTitle,
+                _L.AboutVersionSub,
                 new TextBlock { Text = "Rewind v0.1", FontWeight = FontWeights.Bold, Foreground = _theme.TextPrimary }
             ));
             cardStack.Children.Add(CreateRowDivider());
 
             cardStack.Children.Add(CreateRaycastSettingsRow(
-                "Koder graficzny GPU",
-                "Natywny akcelerator sprzętowy h264_nvenc z zerowym opóźnieniem.",
-                new TextBlock { Text = "NVIDIA GeForce RTX 3060", Foreground = _theme.StatusBadgeFg, FontWeight = FontWeights.SemiBold }
+                _L.AboutGpuTitle,
+                _L.AboutGpuSub,
+                new TextBlock { Text = "NVIDIA NVENC / QuickSync / AMF", Foreground = _theme.StatusBadgeFg, FontWeight = FontWeights.SemiBold }
             ));
             cardStack.Children.Add(CreateRowDivider());
 
             cardStack.Children.Add(CreateRaycastSettingsRow(
-                "Silnik audio",
-                "WASAPI Loopback 48kHz Stereo + mikser mikrofonowy w czasie rzeczywistym.",
+                _L.AboutAudioTitle,
+                _L.AboutAudioSub,
                 new TextBlock { Text = "WASAPI Studio 48kHz", Foreground = _theme.TextPrimary }
             ));
             cardStack.Children.Add(CreateRowDivider());
 
             cardStack.Children.Add(CreateRaycastSettingsRow(
-                "Narzut zasobów na system",
-                "Zminimalizowana praca procesora oraz pamięci RAM podczas grania.",
+                _L.AboutFootprintTitle,
+                _L.AboutFootprintSub,
                 new TextBlock { Text = "< 0.5% CPU • ~80 MB RAM", Foreground = _theme.AccentCoral, FontWeight = FontWeights.SemiBold }
             ));
 
@@ -2075,25 +2115,25 @@ namespace ClipFlow {
 
         private void UpdateHeroTitle() {
             if (_heroTitle != null) {
-                _heroTitle.Text = string.Format("Zapisz ostatnie {0} sekund", _settings.ClipDuration);
+                _heroTitle.Text = string.Format(_L.HeroTitleFormat, _settings.ClipDuration);
             }
             if (_heroClipBtn != null) {
                 var border = _heroClipBtn.Content as Border;
                 if (border != null) {
                     var tb = border.Child as TextBlock;
                     if (tb != null) {
-                        tb.Text = string.Format("⚡ Zapisz klip ({0})", _settings.Hotkey);
+                        tb.Text = string.Format("⚡ {0} ({1})", _L.HeroButton.Replace("✦  ", "").Replace("✦ ", ""), _settings.Hotkey);
                     }
                 }
             }
             if (_heroHotkeyBadge != null) {
-                _heroHotkeyBadge.Text = "SKRÓT: " + _settings.Hotkey;
+                _heroHotkeyBadge.Text = _L.HeroHotkeyPrefix + _settings.Hotkey;
             }
             if (_sidebarInfoSubtext != null) {
-                _sidebarInfoSubtext.Text = string.Format("Skrót: [{0}] • Bufor: {1}s", _settings.Hotkey, _settings.ClipDuration);
+                _sidebarInfoSubtext.Text = string.Format(_L.SidebarInfoFormat, _settings.Hotkey, _settings.ClipDuration);
             }
             if (_notifyIcon != null) {
-                _notifyIcon.Text = string.Format("Rewind - Gotowy [{0}]", _settings.Hotkey);
+                _notifyIcon.Text = string.Format("Rewind - [{0}]", _settings.Hotkey);
             }
         }
 
@@ -2254,8 +2294,16 @@ namespace ClipFlow {
         // GORGEOUS TASKBAR TRAY MENU SETUP
         // ---------------------------------------------------------------------
         private void InitTrayIcon() {
+            if (_notifyIcon != null) {
+                try {
+                    _notifyIcon.Visible = false;
+                    _notifyIcon.Dispose();
+                } catch { }
+                _notifyIcon = null;
+            }
+
             _notifyIcon = new NotifyIcon {
-                Text = string.Format("Rewind - Gotowy [{0}]", _settings.Hotkey),
+                Text = string.Format("Rewind [{0}]", _settings.Hotkey),
                 Icon = LoadAppIcon(),
                 Visible = true
             };
@@ -2270,14 +2318,14 @@ namespace ClipFlow {
             };
 
             // 1. Header Banner Item (Rewind v0.1)
-            var header = new ToolStripMenuItem("✦  Rewind v0.1") {
+            var header = new ToolStripMenuItem(_L.TrayHeader) {
                 Tag = "header",
                 Enabled = false,
                 Font = new Font("Segoe UI Variable Text", 10f, System.Drawing.FontStyle.Bold)
             };
             menu.Items.Add(header);
 
-            _trayStatusItem = new ToolStripMenuItem("    ● Bufor aktywny (NVENC)") {
+            _trayStatusItem = new ToolStripMenuItem(_engine.IsRecording ? _L.TrayBufferActive : _L.TrayBufferPaused) {
                 Tag = "status",
                 Enabled = false,
                 Font = new Font("Segoe UI Variable Text", 8.5f, System.Drawing.FontStyle.Regular)
@@ -2287,7 +2335,7 @@ namespace ClipFlow {
             menu.Items.Add(new ToolStripSeparator());
 
             // 2. Action: Save Clip Now
-            var clipItem = new ToolStripMenuItem("⚡  Zapisz powtórkę teraz", null, delegate {
+            var clipItem = new ToolStripMenuItem(_L.TraySaveClip, null, delegate {
                 _engine.SaveClip();
             }) {
                 ShortcutKeyDisplayString = "[" + _settings.Hotkey + "]",
@@ -2296,7 +2344,7 @@ namespace ClipFlow {
             menu.Items.Add(clipItem);
 
             // 3. Action: Pause / Resume Buffer
-            _trayBufferToggleItem = new ToolStripMenuItem(_engine.IsRecording ? "⏸  Wstrzymaj buforowanie" : "▶  Wznów buforowanie", null, delegate {
+            _trayBufferToggleItem = new ToolStripMenuItem(_engine.IsRecording ? _L.TrayPauseBuffer : _L.TrayResumeBuffer, null, delegate {
                 if (_engine.IsRecording) {
                     _engine.Stop();
                 } else {
@@ -2308,13 +2356,13 @@ namespace ClipFlow {
             menu.Items.Add(new ToolStripSeparator());
 
             // 4. Open Settings
-            var settingsItem = new ToolStripMenuItem("⚙️  Ustawienia Rewind", null, delegate {
+            var settingsItem = new ToolStripMenuItem(_L.TraySettings, null, delegate {
                 ShowAndActivate();
             });
             menu.Items.Add(settingsItem);
 
             // 5. Open Clips Folder
-            var folderItem = new ToolStripMenuItem("📂  Otwórz folder z klipami", null, delegate {
+            var folderItem = new ToolStripMenuItem(_L.TrayOpenFolder, null, delegate {
                 OpenClipsFolder();
             });
             menu.Items.Add(folderItem);
@@ -2322,7 +2370,7 @@ namespace ClipFlow {
             menu.Items.Add(new ToolStripSeparator());
 
             // 6. Exit
-            var exitItem = new ToolStripMenuItem("🚪  Zakończ Rewind", null, delegate {
+            var exitItem = new ToolStripMenuItem(_L.TrayExit, null, delegate {
                 _isExiting = true;
                 _engine.Stop();
                 _notifyIcon.Visible = false;
@@ -2378,15 +2426,15 @@ namespace ClipFlow {
             }
 
             if (!startMinimized) {
-                Show();
+                ShowAndActivate();
             } else {
                 WindowState = WindowState.Minimized;
                 Hide();
                 if (_notifyIcon != null) {
                     _notifyIcon.ShowBalloonTip(
                         2500,
-                        "Rewind gotowy w zasobniku",
-                        string.Format("Bufor powtórek aktywny w tle. Wciśnij {0}, aby zapisać klip.", _settings.Hotkey),
+                        _L.BalloonTitle,
+                        string.Format(_L.BalloonSub, _settings.Hotkey),
                         ToolTipIcon.Info
                     );
                 }
@@ -2402,7 +2450,7 @@ namespace ClipFlow {
             NativeMethods.RegisterHotKey(_hwnd, NativeMethods.HOTKEY_ID, mod, vk);
 
             if (_notifyIcon != null) {
-                _notifyIcon.Text = string.Format("Rewind - Gotowy [{0}]", _settings.Hotkey);
+                _notifyIcon.Text = string.Format("Rewind [{0}]", _settings.Hotkey);
             }
         }
 
@@ -2423,8 +2471,8 @@ namespace ClipFlow {
                 if (_notifyIcon != null) {
                     _notifyIcon.ShowBalloonTip(
                         2000,
-                        "Rewind działa w zasobniku",
-                        string.Format("Wciśnij {0}, aby w dowolnej chwili zapisać powtórkę.", _settings.Hotkey),
+                        _L.BalloonTitle,
+                        string.Format(_L.BalloonSub, _settings.Hotkey),
                         ToolTipIcon.Info
                     );
                 }
@@ -2446,22 +2494,22 @@ namespace ClipFlow {
                 Dispatcher.Invoke(new Action(delegate {
                     if (recording) {
                         _sidebarStatusDot.Fill = new SolidColorBrush(Color.FromRgb(16, 185, 129));
-                        _sidebarStatusText.Text = "Bufor aktywny (NVENC)";
+                        _sidebarStatusText.Text = _L.SidebarStatusActive;
                         _sidebarStatusText.Foreground = new SolidColorBrush(Color.FromRgb(209, 250, 229));
-                        if (_toggleBufferBtn != null) _toggleBufferBtn.Content = "⏸ Wstrzymaj buforowanie";
-                        if (_trayBufferToggleItem != null) _trayBufferToggleItem.Text = "⏸  Wstrzymaj buforowanie";
+                        if (_toggleBufferBtn != null) _toggleBufferBtn.Content = _L.TrayPauseBuffer;
+                        if (_trayBufferToggleItem != null) _trayBufferToggleItem.Text = _L.TrayPauseBuffer;
                         if (_trayStatusItem != null) {
-                            _trayStatusItem.Text = "    ● Bufor aktywny (NVENC)";
+                            _trayStatusItem.Text = _L.TrayBufferActive;
                             _trayStatusItem.ForeColor = System.Drawing.Color.FromArgb(16, 185, 129);
                         }
                     } else {
                         _sidebarStatusDot.Fill = new SolidColorBrush(Color.FromRgb(245, 158, 11));
-                        _sidebarStatusText.Text = "Zatrzymany";
+                        _sidebarStatusText.Text = _L.SidebarStatusPaused;
                         _sidebarStatusText.Foreground = new SolidColorBrush(Color.FromRgb(254, 243, 199));
-                        if (_toggleBufferBtn != null) _toggleBufferBtn.Content = "▶ Wznów buforowanie";
-                        if (_trayBufferToggleItem != null) _trayBufferToggleItem.Text = "▶  Wznów buforowanie";
+                        if (_toggleBufferBtn != null) _toggleBufferBtn.Content = _L.TrayResumeBuffer;
+                        if (_trayBufferToggleItem != null) _trayBufferToggleItem.Text = _L.TrayResumeBuffer;
                         if (_trayStatusItem != null) {
-                            _trayStatusItem.Text = "    ● Bufor wstrzymany";
+                            _trayStatusItem.Text = _L.TrayBufferPaused;
                             _trayStatusItem.ForeColor = System.Drawing.Color.FromArgb(245, 158, 11);
                         }
                     }
@@ -2474,17 +2522,17 @@ namespace ClipFlow {
                     RefreshClipsList();
 
                     string fileName = Path.GetFileName(path);
-                    _toastText.Text = string.Format("🎬 Zapisano klip: {0} ({1}s)", fileName, duration);
+                    _toastText.Text = string.Format("🎬 {0}: {1} ({2}s)", _L.ClipsTitle, fileName, duration);
                     _toastBanner.Visibility = Visibility.Visible;
 
                     if (_settings.ShowNotification) {
-                        HudNotificationWindow.ShowToast(fileName, duration, path, _theme);
+                        HudNotificationWindow.ShowToast(fileName, duration, path, _theme, _L);
                     }
 
                     if (_notifyIcon != null) {
                         _notifyIcon.ShowBalloonTip(
                             3000,
-                            "🎬 Klip zapisany!",
+                            string.Format(_L.HudTitleFormat, duration),
                             string.Format("{0} ({1}s)", fileName, duration),
                             ToolTipIcon.Info
                         );
@@ -2607,7 +2655,7 @@ namespace ClipFlow {
                 FontWeight = FontWeights.Medium,
                 Padding = new Thickness(12, 5, 12, 5),
                 Margin = new Thickness(0, 0, 6, 0),
-                Content = "▶ Odtwórz"
+                Content = _L.ClipsPlay
             };
             StyleModernButton(playBtn, 10);
             playBtn.Click += delegate {

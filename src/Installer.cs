@@ -15,6 +15,8 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shell;
 using Microsoft.Win32;
+using System.Text;
+using System.Web.Script.Serialization;
 using Application = System.Windows.Application;
 using Binding = System.Windows.Data.Binding;
 using Button = System.Windows.Controls.Button;
@@ -99,6 +101,7 @@ namespace RewindInstaller {
         private InstallerStrings _s;
         private Dictionary<string, InstallerStrings> _languages;
         private bool _isCompleted = false;
+        private bool _appLaunched = false;
 
         private TextBlock _titleTb;
         private TextBlock _headerTitle;
@@ -135,6 +138,13 @@ namespace RewindInstaller {
             InitLanguages();
             InitWindow();
             BuildUI();
+
+            Closing += delegate {
+                if (_isCompleted && !_isUninstall && _cbLaunchNow != null && _cbLaunchNow.IsChecked == true && !_appLaunched) {
+                    _appLaunched = true;
+                    LaunchInstalledApp();
+                }
+            };
         }
 
         private void InitLanguages() {
@@ -677,16 +687,9 @@ namespace RewindInstaller {
             StyleModernButton(_actionBtn, 12);
             _actionBtn.Click += delegate {
                 if (_isCompleted) {
-                    if (!_isUninstall && _cbLaunchNow != null && _cbLaunchNow.IsChecked == true) {
-                        try {
-                            string destExe = Path.Combine(_targetDir, "Rewind.exe");
-                            if (File.Exists(destExe)) {
-                                Process.Start(new ProcessStartInfo(destExe) {
-                                    WorkingDirectory = _targetDir,
-                                    UseShellExecute = true
-                                });
-                            }
-                        } catch { }
+                    if (!_isUninstall && _cbLaunchNow != null && _cbLaunchNow.IsChecked == true && !_appLaunched) {
+                        _appLaunched = true;
+                        LaunchInstalledApp();
                     }
                     Close();
                     return;
@@ -1121,6 +1124,9 @@ namespace RewindInstaller {
                         SetAutostart(destExe, true);
                     }
 
+                    // Save selected language and preferences so Rewind starts in the user's chosen language
+                    SaveInitialSettings(_targetDir, _currentLang, autostart);
+
                     // Shell notification so Windows Search and Explorer index the new app immediately
                     NotifyShell();
 
@@ -1205,6 +1211,72 @@ namespace RewindInstaller {
                 _progressBar.Value = percent;
                 _statusSubtitle.Text = text;
             }));
+        }
+
+        private void LaunchInstalledApp() {
+            try {
+                string destExe = Path.Combine(_targetDir, "Rewind.exe");
+                if (File.Exists(destExe)) {
+                    Process.Start(new ProcessStartInfo(destExe, "--show") {
+                        WorkingDirectory = _targetDir,
+                        UseShellExecute = true
+                    });
+                }
+            } catch { }
+        }
+
+        private static void SaveInitialSettings(string targetDir, string langCode, bool autostart) {
+            try {
+                string settingsPath = Path.Combine(targetDir, "rewind_settings.json");
+                Dictionary<string, object> dict = null;
+                if (File.Exists(settingsPath)) {
+                    try {
+                        var js = new JavaScriptSerializer();
+                        dict = js.Deserialize<Dictionary<string, object>>(File.ReadAllText(settingsPath, Encoding.UTF8));
+                    } catch { }
+                }
+
+                if (dict == null) {
+                    dict = new Dictionary<string, object>();
+                    dict["ClipDuration"] = 30;
+                    dict["Fps"] = 60;
+                    dict["Bitrate"] = "12M";
+                    dict["Hotkey"] = "F8";
+                    dict["BufferActive"] = true;
+                    dict["PlaySound"] = true;
+                    dict["StartMinimized"] = false;
+                    dict["SystemVolumePercent"] = 100;
+                    dict["MicVolumePercent"] = 100;
+                    dict["SelectedMicId"] = "default";
+                    dict["CaptureCursor"] = false;
+                    dict["Theme"] = "Dark";
+                    dict["SoundPreset"] = "Default";
+                    dict["CustomSoundPath"] = "";
+                    dict["ShowNotification"] = true;
+                    dict["PerformanceProfile"] = "Balanced";
+                    string vid = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyVideos), "Rewind");
+                    if (!Directory.Exists(vid)) {
+                        try { Directory.CreateDirectory(vid); } catch { }
+                    }
+                    dict["ClipsFolder"] = vid;
+                }
+
+                dict["Language"] = langCode;
+                dict["AutoStart"] = autostart;
+                dict["StartMinimized"] = false;
+
+                var serializer = new JavaScriptSerializer();
+                string json = serializer.Serialize(dict);
+                File.WriteAllText(settingsPath, json, Encoding.UTF8);
+
+                // Also sync to %LOCALAPPDATA%\Rewind\rewind_settings.json if directory exists
+                try {
+                    string appDataDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Rewind");
+                    if (Directory.Exists(appDataDir)) {
+                        File.WriteAllText(Path.Combine(appDataDir, "rewind_settings.json"), json, Encoding.UTF8);
+                    }
+                } catch { }
+            } catch { }
         }
 
         private static void CreateShortcut(string shortcutPath, string targetExePath, string description) {

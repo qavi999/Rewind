@@ -32,6 +32,7 @@ $wpf = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF"
 
 $sources = @(
     "$srcDir\Settings.cs",
+    "$srcDir\AppLocalization.cs",
     "$srcDir\NativeMethods.cs",
     "$srcDir\SoundEffect.cs",
     "$srcDir\WasapiLoopback.cs",

@@ -49,14 +49,21 @@ namespace ClipFlow {
                 var mainWindow = new MainWindow(settings, engine);
 
                 bool startMinimized = settings.StartMinimized;
+                bool forceShow = false;
                 if (args != null) {
                     for (int i = 0; i < args.Length; i++) {
                         string a = args[i].ToLowerInvariant();
                         if (a == "--minimized" || a == "-minimized" || a == "--autostart" || a == "-silent") {
                             startMinimized = true;
-                            break;
+                        } else if (a == "--show" || a == "-show" || a == "--settings" || a == "-open") {
+                            forceShow = true;
+                            startMinimized = false;
                         }
                     }
+                }
+
+                if (forceShow) {
+                    startMinimized = false;
                 }
 
                 mainWindow.InitializeSystemIntegration(startMinimized);

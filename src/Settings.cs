@@ -73,8 +73,10 @@ namespace ClipFlow {
         public string CustomSoundPath { get; set; }
         public bool ShowNotification { get; set; }
         public string PerformanceProfile { get; set; }
+        public string Language { get; set; }
 
         public AppSettings() {
+            Language = "pl";
             ClipDuration = 30;
             Fps = 60;
             Bitrate = "12M";

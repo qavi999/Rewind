@@ -352,21 +352,14 @@ namespace ClipFlow {
                 Width = 34,
                 Height = 34,
                 CornerRadius = new CornerRadius(9),
-                Background = new System.Windows.Media.LinearGradientBrush(
-                    Color.FromRgb(139, 92, 246),
-                    Color.FromRgb(99, 102, 241),
-                    45.0
-                ),
+                ClipToBounds = true,
                 VerticalAlignment = VerticalAlignment.Center,
-                Child = new TextBlock {
-                    Text = "✦",
-                    FontSize = 16,
-                    FontWeight = FontWeights.Bold,
-                    Foreground = System.Windows.Media.Brushes.White,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
+                Child = new System.Windows.Controls.Image {
+                    Source = MainWindow.LoadAppIconImage(),
+                    Stretch = System.Windows.Media.Stretch.Uniform
                 }
             };
+            RenderOptions.SetBitmapScalingMode(iconBox, BitmapScalingMode.HighQuality);
             Grid.SetColumn(iconBox, 0);
             grid.Children.Add(iconBox);
 
@@ -762,7 +755,7 @@ namespace ClipFlow {
             return SystemIcons.Application;
         }
 
-        private static ImageSource LoadAppIconImage() {
+        public static ImageSource LoadAppIconImage() {
             try {
                 var asm = Assembly.GetExecutingAssembly();
                 using (var stream = asm.GetManifestResourceStream("app.ico")) {
@@ -847,21 +840,14 @@ namespace ClipFlow {
                 Width = 26,
                 Height = 26,
                 CornerRadius = new CornerRadius(8),
-                Background = new System.Windows.Media.LinearGradientBrush(
-                    Color.FromRgb(139, 92, 246), // Electric Violet
-                    Color.FromRgb(99, 102, 241),
-                    45.0
-                ),
+                ClipToBounds = true,
                 Margin = new Thickness(0, 0, 10, 0),
-                Child = new TextBlock {
-                    Text = "✦",
-                    Foreground = System.Windows.Media.Brushes.White,
-                    FontSize = 13,
-                    FontWeight = FontWeights.Bold,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
+                Child = new System.Windows.Controls.Image {
+                    Source = LoadAppIconImage(),
+                    Stretch = System.Windows.Media.Stretch.Uniform
                 }
             };
+            RenderOptions.SetBitmapScalingMode(logoBox, BitmapScalingMode.HighQuality);
             brandStack.Children.Add(logoBox);
 
             var titleText = new TextBlock {
@@ -2224,7 +2210,7 @@ namespace ClipFlow {
                 if (border != null) {
                     var tb = border.Child as TextBlock;
                     if (tb != null) {
-                        tb.Text = string.Format("⚡ {0} ({1})", _L.HeroButton.Replace("✦  ", "").Replace("✦ ", ""), _settings.Hotkey);
+                        tb.Text = string.Format("⚡ {0} ({1})", _L.HeroButton.Replace("✦  ", "").Replace("✦ ", "").Replace("⚡  ", "").Replace("⚡ ", ""), _settings.Hotkey);
                     }
                 }
             }

@@ -646,21 +646,14 @@ namespace RewindInstaller {
                 Width = 38,
                 Height = 38,
                 CornerRadius = new CornerRadius(10),
-                Background = new LinearGradientBrush(
-                    Color.FromRgb(139, 92, 246), // Electric Violet Accent
-                    Color.FromRgb(99, 102, 241),
-                    45.0
-                ),
+                ClipToBounds = true,
                 Margin = new Thickness(0, 0, 14, 0),
-                Child = new TextBlock {
-                    Text = "✦",
-                    Foreground = System.Windows.Media.Brushes.White,
-                    FontSize = 18,
-                    FontWeight = FontWeights.Bold,
-                    HorizontalAlignment = HorizontalAlignment.Center,
-                    VerticalAlignment = VerticalAlignment.Center
+                Child = new Image {
+                    Source = LoadAppIconImage(),
+                    Stretch = Stretch.Uniform
                 }
             };
+            RenderOptions.SetBitmapScalingMode(logoBox, BitmapScalingMode.HighQuality);
             headerStack.Children.Add(logoBox);
 
             var headerTextStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };

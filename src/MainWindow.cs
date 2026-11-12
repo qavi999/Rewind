@@ -1751,15 +1751,11 @@ namespace ClipFlow {
             ));
             soundStack.Children.Add(CreateRowDivider());
 
-            // Presety dźwiękowe (pełna szerokość karty, z testem w nagłówku)
+            // Presety dźwiękowe (pełna szerokość karty)
             var presetBlock = new StackPanel {
                 Orientation = Orientation.Vertical,
                 Margin = new Thickness(0, 8, 0, 8)
             };
-
-            var presetHeader = new Grid();
-            presetHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star), MinWidth = 200 });
-            presetHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var presetText = new StackPanel { Orientation = Orientation.Vertical, VerticalAlignment = VerticalAlignment.Center };
             presetText.Children.Add(new TextBlock {
@@ -1774,29 +1770,7 @@ namespace ClipFlow {
                 Foreground = _theme.TextSecondary,
                 Margin = new Thickness(0, 2, 0, 0)
             });
-            Grid.SetColumn(presetText, 0);
-            presetHeader.Children.Add(presetText);
-
-            var testSoundBtn = new Button {
-                Cursor = System.Windows.Input.Cursors.Hand,
-                Background = _theme.AccentCoralSoft,
-                BorderBrush = _theme.AccentCoral,
-                BorderThickness = new Thickness(1),
-                Foreground = _theme.AccentCoral,
-                FontSize = 11.5,
-                FontWeight = FontWeights.SemiBold,
-                Padding = new Thickness(14, 5, 14, 5),
-                Content = _L.AudioTestBtn,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            StyleModernButton(testSoundBtn, 10);
-            testSoundBtn.Click += delegate {
-                SoundEffect.PlayPreview(_settings.SoundPreset, _settings.CustomSoundPath);
-            };
-            Grid.SetColumn(testSoundBtn, 1);
-            presetHeader.Children.Add(testSoundBtn);
-
-            presetBlock.Children.Add(presetHeader);
+            presetBlock.Children.Add(presetText);
 
             var presetsWrap = new WrapPanel {
                 Orientation = Orientation.Horizontal,

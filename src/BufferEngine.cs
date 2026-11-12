@@ -21,6 +21,8 @@ namespace ClipFlow {
         private bool _isSaving;
         private string _resolvedFfmpegPath;
         private string _activeEncoder = "h264_nvenc";
+        private bool _useDdagrab = true;
+        private DateTime _recordStartTime = DateTime.MinValue;
 
         public event Action<bool, string> StatusChanged;
         public event Action<string, int> ClipSaved;
@@ -72,7 +74,7 @@ namespace ClipFlow {
                 legacyFfmpeg,
                 Path.Combine(baseDir, "..", "..", "tools", "ffmpeg.exe"),
                 Path.Combine(baseDir, "tools", "ffmpeg.exe"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "clipowanie", "tools", "ffmpeg.exe")
+                @"E:\clipowanie\tools\ffmpeg.exe"
             };
 
             foreach (var c in candidates) {
@@ -184,58 +186,103 @@ namespace ClipFlow {
                 int fps = _settings.Fps > 0 ? _settings.Fps : 60;
                 string bitrate = string.IsNullOrEmpty(_settings.Bitrate) ? "12M" : _settings.Bitrate;
                 string segPattern = Path.Combine(_bufferDir, "seg_%02d.ts");
-
-                string encoderParams;
-                if (_activeEncoder == "h264_nvenc") {
-                    encoderParams = string.Format("-c:v h264_nvenc -preset p1 -tune ull -zerolatency 1 -b:v {0} -maxrate 16M -bufsize 8M -pix_fmt yuv420p", bitrate);
-                } else if (_activeEncoder == "h264_amf") {
-                    encoderParams = string.Format("-c:v h264_amf -quality speed -b:v {0} -pix_fmt yuv420p", bitrate);
-                } else if (_activeEncoder == "h264_qsv") {
-                    encoderParams = string.Format("-c:v h264_qsv -preset veryfast -b:v {0} -pix_fmt yuv420p", bitrate);
-                } else {
-                    encoderParams = string.Format("-c:v libx264 -preset ultrafast -tune zerolatency -b:v {0} -pix_fmt yuv420p", bitrate);
-                }
+                int drawMouse = (_settings != null && _settings.CaptureCursor) ? 1 : 0;
 
                 string audioInput = "";
+                string mapAudio = "";
                 string audioCodec = "";
                 if (_audioServer != null) {
                     audioInput = string.Format("-f f32le -ar {0} -ac 2 -i \"{1}\"", _audioServer.SampleRate, _audioServer.PipePath);
+                    mapAudio = "-map 0:a";
                     audioCodec = "-c:a aac -b:a 192k";
                 }
 
-                int drawMouse = (_settings != null && _settings.CaptureCursor) ? 1 : 0;
-                string screenArgs = "";
-                try {
-                    var screens = Screen.AllScreens;
-                    if (screens != null && screens.Length > 0) {
-                        Screen targetScreen = null;
-                        if (!string.IsNullOrEmpty(_settings.SelectedDisplayDevice)) {
-                            targetScreen = screens.FirstOrDefault(s => string.Equals(s.DeviceName, _settings.SelectedDisplayDevice, StringComparison.OrdinalIgnoreCase));
-                        }
-                        if (targetScreen == null && _settings.SelectedDisplayIndex >= 0 && _settings.SelectedDisplayIndex < screens.Length) {
-                            targetScreen = screens[_settings.SelectedDisplayIndex];
-                        }
-                        if (targetScreen == null) {
-                            targetScreen = screens.FirstOrDefault(s => s.Primary) ?? screens[0];
-                        }
-                        if (targetScreen != null) {
-                            screenArgs = string.Format("-offset_x {0} -offset_y {1} -video_size {2}x{3} ",
-                                targetScreen.Bounds.X,
-                                targetScreen.Bounds.Y,
-                                targetScreen.Bounds.Width,
-                                targetScreen.Bounds.Height);
-                        }
-                    }
-                } catch { }
+                string args;
 
-                string args = string.Format(
-                    "-y -nostats -loglevel error -f gdigrab -framerate {0} -rtbufsize 256M -draw_mouse {1} {2}-i desktop " +
-                    "{3} " +
-                    "{4} " +
-                    "{5} " +
-                    "-g {0} -keyint_min {0} -f segment -segment_time {6} -segment_wrap {7} -reset_timestamps 1 \"{8}\"",
-                    fps, drawMouse, screenArgs, audioInput, encoderParams, audioCodec, segTime, wrapCount, segPattern
-                );
+                if (_useDdagrab) {
+                    int monitorIndex = 0;
+                    try {
+                        var screens = Screen.AllScreens;
+                        if (screens != null && screens.Length > 0) {
+                            if (!string.IsNullOrEmpty(_settings.SelectedDisplayDevice)) {
+                                for (int i = 0; i < screens.Length; i++) {
+                                    if (string.Equals(screens[i].DeviceName, _settings.SelectedDisplayDevice, StringComparison.OrdinalIgnoreCase)) {
+                                        monitorIndex = i;
+                                        break;
+                                    }
+                                }
+                            } else if (_settings.SelectedDisplayIndex >= 0 && _settings.SelectedDisplayIndex < screens.Length) {
+                                monitorIndex = _settings.SelectedDisplayIndex;
+                            }
+                        }
+                    } catch { }
+
+                    string ddaFilter = string.Format("ddagrab=framerate={0}:output_idx={1}:draw_mouse={2}", fps, monitorIndex, drawMouse);
+                    string encoderParams;
+
+                    if (_activeEncoder == "h264_nvenc") {
+                        encoderParams = string.Format("-c:v h264_nvenc -preset p1 -tune ull -zerolatency 1 -b:v {0} -maxrate 16M -bufsize 8M", bitrate);
+                    } else if (_activeEncoder == "h264_amf") {
+                        encoderParams = string.Format("-c:v h264_amf -quality speed -b:v {0}", bitrate);
+                    } else if (_activeEncoder == "h264_qsv") {
+                        ddaFilter += ",hwdownload,format=bgra";
+                        encoderParams = string.Format("-c:v h264_qsv -preset veryfast -b:v {0} -pix_fmt nv12", bitrate);
+                    } else {
+                        ddaFilter += ",hwdownload,format=bgra";
+                        encoderParams = string.Format("-c:v libx264 -preset ultrafast -tune zerolatency -b:v {0} -pix_fmt yuv420p", bitrate);
+                    }
+
+                    args = string.Format(
+                        "-y -nostats -loglevel error -init_hw_device d3d11va -filter_complex \"{0}[v]\" {1} " +
+                        "-map \"[v]\" {2} {3} {4} " +
+                        "-g {5} -keyint_min {5} -f segment -segment_time {6} -segment_wrap {7} -reset_timestamps 1 \"{8}\"",
+                        ddaFilter, audioInput, mapAudio, encoderParams, audioCodec, fps, segTime, wrapCount, segPattern
+                    );
+                } else {
+                    string encoderParams;
+                    if (_activeEncoder == "h264_nvenc") {
+                        encoderParams = string.Format("-c:v h264_nvenc -preset p1 -tune ull -zerolatency 1 -b:v {0} -maxrate 16M -bufsize 8M -pix_fmt yuv420p", bitrate);
+                    } else if (_activeEncoder == "h264_amf") {
+                        encoderParams = string.Format("-c:v h264_amf -quality speed -b:v {0} -pix_fmt yuv420p", bitrate);
+                    } else if (_activeEncoder == "h264_qsv") {
+                        encoderParams = string.Format("-c:v h264_qsv -preset veryfast -b:v {0} -pix_fmt yuv420p", bitrate);
+                    } else {
+                        encoderParams = string.Format("-c:v libx264 -preset ultrafast -tune zerolatency -b:v {0} -pix_fmt yuv420p", bitrate);
+                    }
+
+                    string screenArgs = "";
+                    try {
+                        var screens = Screen.AllScreens;
+                        if (screens != null && screens.Length > 0) {
+                            Screen targetScreen = null;
+                            if (!string.IsNullOrEmpty(_settings.SelectedDisplayDevice)) {
+                                targetScreen = screens.FirstOrDefault(s => string.Equals(s.DeviceName, _settings.SelectedDisplayDevice, StringComparison.OrdinalIgnoreCase));
+                            }
+                            if (targetScreen == null && _settings.SelectedDisplayIndex >= 0 && _settings.SelectedDisplayIndex < screens.Length) {
+                                targetScreen = screens[_settings.SelectedDisplayIndex];
+                            }
+                            if (targetScreen == null) {
+                                targetScreen = screens.FirstOrDefault(s => s.Primary) ?? screens[0];
+                            }
+                            if (targetScreen != null) {
+                                screenArgs = string.Format("-offset_x {0} -offset_y {1} -video_size {2}x{3} ",
+                                    targetScreen.Bounds.X,
+                                    targetScreen.Bounds.Y,
+                                    targetScreen.Bounds.Width,
+                                    targetScreen.Bounds.Height);
+                            }
+                        }
+                    } catch { }
+
+                    args = string.Format(
+                        "-y -nostats -loglevel error -f gdigrab -framerate {0} -rtbufsize 256M -draw_mouse {1} {2}-i desktop " +
+                        "{3} " +
+                        "{4} " +
+                        "{5} " +
+                        "-g {0} -keyint_min {0} -f segment -segment_time {6} -segment_wrap {7} -reset_timestamps 1 \"{8}\"",
+                        fps, drawMouse, screenArgs, audioInput, encoderParams, audioCodec, segTime, wrapCount, segPattern
+                    );
+                }
 
                 try {
                     var psi = new ProcessStartInfo {
@@ -259,6 +306,7 @@ namespace ClipFlow {
                     };
 
                     _ffmpegProcess.Exited += OnProcessExited;
+                    _recordStartTime = DateTime.UtcNow;
                     _ffmpegProcess.Start();
                     _ffmpegProcess.BeginErrorReadLine();
 
@@ -281,6 +329,17 @@ namespace ClipFlow {
             lock (_lock) {
                 if (_isRecording) {
                     _isRecording = false;
+
+                    if (_useDdagrab && (DateTime.UtcNow - _recordStartTime).TotalSeconds < 3.0) {
+                        _useDdagrab = false;
+                        NotifyStatus(false, "Przełączanie na tryb GDI...");
+                        ThreadPool.QueueUserWorkItem(delegate {
+                            Thread.Sleep(300);
+                            Start();
+                        });
+                        return;
+                    }
+
                     NotifyStatus(false, "Bufor zatrzymany");
                 }
             }
@@ -299,14 +358,17 @@ namespace ClipFlow {
                 _isRecording = false;
 
                 try {
-                    if (_ffmpegProcess != null && !_ffmpegProcess.HasExited) {
-                        try {
-                            _ffmpegProcess.StandardInput.WriteLine("q");
-                            if (!_ffmpegProcess.WaitForExit(1500)) {
+                    if (_ffmpegProcess != null) {
+                        _ffmpegProcess.Exited -= OnProcessExited;
+                        if (!_ffmpegProcess.HasExited) {
+                            try {
+                                _ffmpegProcess.StandardInput.WriteLine("q");
+                                if (!_ffmpegProcess.WaitForExit(1500)) {
+                                    _ffmpegProcess.Kill();
+                                }
+                            } catch {
                                 _ffmpegProcess.Kill();
                             }
-                        } catch {
-                            _ffmpegProcess.Kill();
                         }
                     }
                 } catch { } finally {

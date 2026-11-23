@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Rewind Linux Graphical Installer (GUI Setup)
+Rewind Linux Graphical Installer (GUI Setup & CLI)
 Sleek, modern windowed installer matching the Windows RewindSetup experience.
+Contains embedded application payload; installs Rewind onto the system.
 """
 
 import os
 import sys
 import time
+import gzip
 import base64
 import shutil
 import signal
@@ -20,6 +22,8 @@ try:
     from assets_b64 import LOGO_PNG_B64
 except ImportError:
     LOGO_PNG_B64 = ""
+
+PAYLOAD_GZ_B64 = ""
 
 LANGUAGES = {
     "pl": {
@@ -48,7 +52,7 @@ LANGUAGES = {
         "prog_title_uninst": "Odinstalowywanie programu...",
         "prog_closing": "Zamykanie aktywnych instancji programu...",
         "prog_dir": "Tworzenie katalogów aplikacji...",
-        "prog_copy": "Kopiowanie plików aplikacji i bibliotek...",
+        "prog_copy": "Wypakowywanie i instalowanie plików aplikacji...",
         "prog_shortcuts": "Tworzenie skrótów na Pulpicie i w Menu...",
         "prog_register": "Rejestracja w systemie Linux (aktualizacja bazy .desktop)...",
         "prog_done_install": "Instalacja ukończona pomyślnie!",
@@ -57,7 +61,7 @@ LANGUAGES = {
         "finish_install_sub": "Domyślny skrót do tworzenia klipów: [F8]. Program działa w tle.",
         "finish_uninst_title": "Rewind został pomyślnie odinstalowany",
         "finish_uninst_sub": "Wszystkie pliki i skróty programu zostały usunięte.",
-        "footer_hint": "Rewind v0.2 Standalone (Linux x86_64)",
+        "footer_hint": "Rewind v0.2 Setup (Linux x86_64)",
     },
     "en": {
         "name": "English", "flag": "🇬🇧",
@@ -85,7 +89,7 @@ LANGUAGES = {
         "prog_title_uninst": "Uninstalling Rewind...",
         "prog_closing": "Closing running instances...",
         "prog_dir": "Creating destination directories...",
-        "prog_copy": "Copying application files...",
+        "prog_copy": "Extracting and installing application files...",
         "prog_shortcuts": "Creating Desktop and Menu shortcuts...",
         "prog_register": "Registering with Linux desktop environment...",
         "prog_done_install": "Installation completed successfully!",
@@ -94,7 +98,7 @@ LANGUAGES = {
         "finish_install_sub": "Default clipping hotkey: [F8]. Running silently in background.",
         "finish_uninst_title": "Rewind was successfully uninstalled",
         "finish_uninst_sub": "All program files and shortcuts have been removed.",
-        "footer_hint": "Rewind v0.2 Standalone (Linux x86_64)",
+        "footer_hint": "Rewind v0.2 Setup (Linux x86_64)",
     },
     "de": {
         "name": "Deutsch", "flag": "🇩🇪",
@@ -131,7 +135,7 @@ LANGUAGES = {
         "finish_install_sub": "Standard-Tastenkombination: [F8]. Läuft leise im Hintergrund.",
         "finish_uninst_title": "Rewind wurde deinstalliert",
         "finish_uninst_sub": "Alle Dateien und Verknüpfungen wurden entfernt.",
-        "footer_hint": "Rewind v0.2 Standalone (Linux x86_64)",
+        "footer_hint": "Rewind v0.2 Setup (Linux x86_64)",
     },
     "es": {
         "name": "Español", "flag": "🇪🇸",
@@ -168,7 +172,7 @@ LANGUAGES = {
         "finish_install_sub": "Atajo predeterminado para clips: [F8]. Ejecutándose en segundo plano.",
         "finish_uninst_title": "Rewind se ha desinstalado correctamente",
         "finish_uninst_sub": "Se han eliminado todos los archivos y accesos directos.",
-        "footer_hint": "Rewind v0.2 Standalone (Linux x86_64)",
+        "footer_hint": "Rewind v0.2 Setup (Linux x86_64)",
     },
     "fr": {
         "name": "Français", "flag": "🇫🇷",
@@ -205,7 +209,7 @@ LANGUAGES = {
         "finish_install_sub": "Raccourci par défaut pour les clips : [F8]. Fonctionne en arrière-plan.",
         "finish_uninst_title": "Rewind a été désinstallé avec succès",
         "finish_uninst_sub": "Tous les fichiers et raccourcis ont été supprimés.",
-        "footer_hint": "Rewind v0.2 Standalone (Linux x86_64)",
+        "footer_hint": "Rewind v0.2 Setup (Linux x86_64)",
     },
     "ua": {
         "name": "Українська", "flag": "🇺🇦",
@@ -242,7 +246,7 @@ LANGUAGES = {
         "finish_install_sub": "Гаряча клавіша для кліпу: [F8]. Програма працює у фоні.",
         "finish_uninst_title": "Rewind успішно видалено",
         "finish_uninst_sub": "Всі файли та ярлики програми видалено.",
-        "footer_hint": "Rewind v0.2 Standalone (Linux x86_64)",
+        "footer_hint": "Rewind v0.2 Setup (Linux x86_64)",
     }
 }
 
@@ -255,6 +259,207 @@ def detect_system_language():
     except Exception:
         pass
     return "pl"
+
+
+def extract_payload(dest_file):
+    """Extract embedded application payload to target path."""
+    dest_path = Path(dest_file)
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if PAYLOAD_GZ_B64:
+        raw_bin = gzip.decompress(base64.b64decode(PAYLOAD_GZ_B64))
+        dest_path.write_bytes(raw_bin)
+    else:
+        # Fallback to local files if developing unbundled
+        script_dir = Path(__file__).resolve().parent
+        for cand in ["rewind-linux", "rewind.py", "rewind"]:
+            f = script_dir / cand
+            if f.exists():
+                shutil.copy2(str(f), str(dest_path))
+                break
+        else:
+            dest_path.write_text("#!/usr/bin/env python3\n")
+
+    dest_path.chmod(0o755)
+    return dest_path
+
+
+def install_rewind_core(target_dir_str, create_desktop, create_menu, create_autostart, lang_code="pl"):
+    """Core installation logic used by both GUI and CLI."""
+    target_dir = Path(target_dir_str)
+    home = Path.home()
+
+    if os.geteuid() == 0:
+        bin_dir = Path("/usr/local/bin")
+        apps_dir = Path("/usr/share/applications")
+        icons_dir = Path("/usr/share/icons/hicolor/256x256/apps")
+        sudo_user = os.environ.get("SUDO_USER")
+        if sudo_user:
+            user_home = Path(f"/home/{sudo_user}")
+            desktop_dir = user_home / "Desktop"
+            autostart_dir = user_home / ".config" / "autostart"
+        else:
+            desktop_dir = home / "Desktop"
+            autostart_dir = home / ".config" / "autostart"
+    else:
+        bin_dir = home / ".local" / "bin"
+        apps_dir = home / ".local" / "share" / "applications"
+        icons_dir = home / ".local" / "share" / "icons" / "hicolor" / "256x256" / "apps"
+        desktop_dir = home / "Desktop"
+        autostart_dir = home / ".config" / "autostart"
+
+    # Stop running instances
+    try:
+        subprocess.run(["pkill", "-f", "rewind"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+    # Create directories
+    target_dir.mkdir(parents=True, exist_ok=True)
+    bin_dir.mkdir(parents=True, exist_ok=True)
+    apps_dir.mkdir(parents=True, exist_ok=True)
+    icons_dir.mkdir(parents=True, exist_ok=True)
+    (home / "Videos" / "Rewind").mkdir(parents=True, exist_ok=True)
+    (home / ".config" / "rewind").mkdir(parents=True, exist_ok=True)
+
+    # Extract application binary into target directory
+    dest_bin = target_dir / "rewind"
+    extract_payload(dest_bin)
+
+    # Create symlink or wrapper in bin directory
+    sym_bin = bin_dir / "rewind"
+    try:
+        if sym_bin.exists() or sym_bin.is_symlink():
+            sym_bin.unlink()
+        sym_bin.symlink_to(dest_bin)
+    except Exception:
+        try:
+            shutil.copy2(str(dest_bin), str(sym_bin))
+            sym_bin.chmod(0o755)
+        except Exception:
+            pass
+
+    installed_bin = sym_bin if sym_bin.exists() else dest_bin
+
+    # Extract icon
+    dest_icon = icons_dir / "rewind.png"
+    cfg_icon = home / ".config" / "rewind" / "icon.png"
+    if LOGO_PNG_B64:
+        raw_icon = base64.b64decode(LOGO_PNG_B64)
+        dest_icon.write_bytes(raw_icon)
+        cfg_icon.write_bytes(raw_icon)
+
+    # Desktop shortcut template
+    desktop_content = f"""[Desktop Entry]
+Name=Rewind
+GenericName=Replay Recorder
+Comment=Instant replay rolling buffer clip recorder
+Exec={installed_bin}
+Icon=rewind
+Terminal=false
+Type=Application
+Categories=AudioVideo;Recorder;Utility;
+Keywords=replay;clip;recording;gameplay;shadowplay;
+StartupNotify=true
+Actions=SaveClip;ToggleBuffer;
+
+[Desktop Action SaveClip]
+Name=Zapisz powtórkę
+Exec={installed_bin} --save
+
+[Desktop Action ToggleBuffer]
+Name=Wstrzymaj / Wznów bufor
+Exec={installed_bin} --toggle
+"""
+
+    # 1. Application Menu (.desktop)
+    if create_menu:
+        app_desktop = apps_dir / "rewind.desktop"
+        app_desktop.write_text(desktop_content, encoding="utf-8")
+        app_desktop.chmod(0o755)
+
+    # 2. Desktop Shortcut (.desktop)
+    if create_desktop:
+        desktop_dir.mkdir(parents=True, exist_ok=True)
+        desk_file = desktop_dir / "rewind.desktop"
+        desk_file.write_text(desktop_content, encoding="utf-8")
+        desk_file.chmod(0o755)
+        try:
+            subprocess.run(["gio", "set", str(desk_file), "metadata::trusted", "true"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+    # 3. Autostart Shortcut
+    if create_autostart:
+        autostart_dir.mkdir(parents=True, exist_ok=True)
+        auto_file = autostart_dir / "rewind.desktop"
+        auto_desktop = desktop_content.replace(f"Exec={installed_bin}", f"Exec={installed_bin} --daemon")
+        auto_file.write_text(auto_desktop, encoding="utf-8")
+        auto_file.chmod(0o755)
+
+    # Update desktop database
+    try:
+        subprocess.run(["update-desktop-database", str(apps_dir)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+    # Save initial settings with language
+    try:
+        settings_json = home / ".config" / "rewind" / "rewind_settings.json"
+        if not settings_json.exists():
+            init_conf = f'{{"Language": "{lang_code}", "AutoStart": {str(create_autostart).lower()}}}\n'
+            settings_json.write_text(init_conf, encoding="utf-8")
+    except Exception:
+        pass
+
+    return installed_bin
+
+
+def uninstall_rewind_core():
+    """Core uninstallation logic."""
+    home = Path.home()
+    if os.geteuid() == 0:
+        target_dir = Path("/usr/local/share/rewind")
+        bin_file = Path("/usr/local/bin/rewind")
+        apps_file = Path("/usr/share/applications/rewind.desktop")
+        icon_file = Path("/usr/share/icons/hicolor/256x256/apps/rewind.png")
+        sudo_user = os.environ.get("SUDO_USER")
+        if sudo_user:
+            user_desk = Path(f"/home/{sudo_user}/Desktop/rewind.desktop")
+            user_auto = Path(f"/home/{sudo_user}/.config/autostart/rewind.desktop")
+        else:
+            user_desk = home / "Desktop/rewind.desktop"
+            user_auto = home / ".config/autostart/rewind.desktop"
+    else:
+        target_dir = home / ".local/share/rewind"
+        bin_file = home / ".local/bin/rewind"
+        apps_file = home / ".local/share/applications/rewind.desktop"
+        icon_file = home / ".local/share/icons/hicolor/256x256/apps/rewind.png"
+        user_desk = home / "Desktop/rewind.desktop"
+        user_auto = home / ".config/autostart/rewind.desktop"
+
+    try:
+        subprocess.run(["pkill", "-f", "rewind"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+    for f in [bin_file, apps_file, icon_file, user_desk, user_auto]:
+        try:
+            if f.exists() or f.is_symlink():
+                f.unlink()
+        except Exception:
+            pass
+
+    try:
+        if target_dir.exists():
+            shutil.rmtree(str(target_dir), ignore_errors=True)
+    except Exception:
+        pass
+
+    try:
+        subprocess.run(["update-desktop-database", str(apps_file.parent)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
 
 
 class RewindInstallerGui:
@@ -271,38 +476,20 @@ class RewindInstallerGui:
         self.s = LANGUAGES[self.current_lang]
         self.is_completed = False
 
-        # Paths
         home = Path.home()
         if os.geteuid() == 0:
             self.default_target = "/usr/local/share/rewind"
-            self.bin_dir = Path("/usr/local/bin")
-            self.apps_dir = Path("/usr/share/applications")
-            self.icons_dir = Path("/usr/share/icons/hicolor/256x256/apps")
-            sudo_user = os.environ.get("SUDO_USER")
-            if sudo_user:
-                user_home = Path(f"/home/{sudo_user}")
-                self.desktop_dir = user_home / "Desktop"
-                self.autostart_dir = user_home / ".config" / "autostart"
-            else:
-                self.desktop_dir = home / "Desktop"
-                self.autostart_dir = home / ".config" / "autostart"
         else:
             self.default_target = str(home / ".local" / "share" / "rewind")
-            self.bin_dir = home / ".local" / "bin"
-            self.apps_dir = home / ".local" / "share" / "applications"
-            self.icons_dir = home / ".local" / "share" / "icons" / "hicolor" / "256x256" / "apps"
-            self.desktop_dir = home / "Desktop"
-            self.autostart_dir = home / ".config" / "autostart"
 
         self.target_dir_var = None
         self.installed_bin = None
 
-        # Colors
+        # Dark Modern Palette (Matching Windows Setup)
         self.C_BG = "#0D0D11"
         self.C_HEADER = "#121218"
         self.C_CARD = "#181822"
         self.C_BORDER = "#282838"
-        self.C_DIVIDER = "#20202E"
         self.C_TEXT = "#F3F3F6"
         self.C_MUTED = "#8E8E9E"
         self.C_ACCENT = "#FF5757"
@@ -316,14 +503,12 @@ class RewindInstallerGui:
         self.C_PILL_ACTIVE_BORDER = "#FF5757"
         self.C_PILL_ACTIVE_FG = "#FF8A8A"
 
-        # Window
         self.root = tk.Tk()
         self.root.title(self.s["title_uninst"] if is_uninstall else self.s["title_setup"])
         self.root.geometry("580x560")
         self.root.minsize(560, 540)
         self.root.configure(bg=self.C_BG)
 
-        # Set logo icon if available
         self.icon_photo = None
         if LOGO_PNG_B64:
             try:
@@ -340,13 +525,12 @@ class RewindInstallerGui:
     def build_ui(self):
         tk = self.tk
 
-        # Root layout
         self.root.columnconfigure(0, weight=1)
         self.root.rowconfigure(0, weight=0)  # Header
         self.root.rowconfigure(1, weight=1)  # Content view
         self.root.rowconfigure(2, weight=0)  # Footer action
 
-        # 1. BRAND HEADER
+        # 1. Brand Header
         self.header_frame = tk.Frame(self.root, bg=self.C_HEADER, height=84)
         self.header_frame.grid(row=0, column=0, sticky="ew")
         self.header_frame.grid_propagate(False)
@@ -354,7 +538,6 @@ class RewindInstallerGui:
         h_inner = tk.Frame(self.header_frame, bg=self.C_HEADER)
         h_inner.pack(fill="both", expand=True, padx=24, pady=16)
 
-        # Logo on left
         if self.icon_photo:
             try:
                 self.logo_lbl = tk.Label(h_inner, image=self.icon_photo, bg=self.C_HEADER)
@@ -383,13 +566,13 @@ class RewindInstallerGui:
         )
         self.h_sub.pack(anchor="w", pady=(2, 0))
 
-        # 2. MAIN CONTENT AREA
+        # 2. Main Content Container
         self.content_container = tk.Frame(self.root, bg=self.C_BG)
         self.content_container.grid(row=1, column=0, sticky="nsew", padx=24, pady=14)
         self.content_container.columnconfigure(0, weight=1)
         self.content_container.rowconfigure(0, weight=1)
 
-        # A. VIEW CONFIG
+        # A. View Config
         self.view_config = tk.Frame(self.content_container, bg=self.C_BG)
         self.view_config.grid(row=0, column=0, sticky="nsew")
 
@@ -487,7 +670,6 @@ class RewindInstallerGui:
             self.cb_autostart = self.create_checkbox(c_opt_in, self.s["cb_autostart"], self.var_autostart)
             self.cb_launch = self.create_checkbox(c_opt_in, self.s["cb_launch"], self.var_launch)
         else:
-            # Uninstall confirm card
             card_uninst = tk.Frame(self.view_config, bg=self.C_CARD, bd=1, relief="solid", highlightbackground=self.C_BORDER, highlightthickness=1)
             card_uninst.pack(fill="both", expand=True)
 
@@ -505,7 +687,7 @@ class RewindInstallerGui:
             )
             self.uninst_txt.pack(anchor="w")
 
-        # B. VIEW PROGRESS
+        # B. View Progress
         self.view_progress = tk.Frame(self.content_container, bg=self.C_BG)
 
         prog_inner = tk.Frame(self.view_progress, bg=self.C_BG)
@@ -529,18 +711,15 @@ class RewindInstallerGui:
         )
         self.prog_sub_lbl.pack(pady=(0, 24))
 
-        # Modern canvas progress bar
         self.progress_canvas = tk.Canvas(prog_inner, width=480, height=10, bg=self.C_CARD, bd=0, highlightthickness=1, highlightbackground=self.C_BORDER)
         self.progress_canvas.pack()
-        self.progress_bar_rect = None
 
-        # C. VIEW FINISH
+        # C. View Finish
         self.view_finish = tk.Frame(self.content_container, bg=self.C_BG)
 
         finish_inner = tk.Frame(self.view_finish, bg=self.C_BG)
         finish_inner.pack(expand=True, fill="both", pady=40)
 
-        # Big green checkmark
         self.check_badge = tk.Label(
             finish_inner,
             text="✓",
@@ -570,7 +749,7 @@ class RewindInstallerGui:
         )
         self.finish_sub_lbl.pack()
 
-        # 3. FOOTER ACTION BAR
+        # 3. Footer Action Bar
         self.footer = tk.Frame(self.root, bg=self.C_HEADER, height=68, bd=1, relief="solid", highlightbackground=self.C_BORDER, highlightthickness=1)
         self.footer.grid(row=2, column=0, sticky="ew")
         self.footer.grid_propagate(False)
@@ -634,7 +813,6 @@ class RewindInstallerGui:
         self.h_title.configure(text=s["header_uninst_title"] if self.is_uninstall else s["header_install_title"])
         self.h_sub.configure(text=s["header_uninst_sub"] if self.is_uninstall else s["header_install_sub"])
 
-        # Update pill styles
         for c, btn in self.pill_buttons.items():
             if c == self.current_lang:
                 btn.configure(bg=self.C_PILL_ACTIVE_BG, fg=self.C_PILL_ACTIVE_FG, highlightbackground=self.C_PILL_ACTIVE_BORDER)
@@ -705,183 +883,42 @@ class RewindInstallerGui:
     def run_install_worker(self):
         s = self.s
         time.sleep(0.2)
-
-        # Step 1: Closing running instances
         self.update_progress(15, s["prog_closing"])
-        try:
-            subprocess.run(["pkill", "-f", "rewind"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
         time.sleep(0.3)
-
-        # Step 2: Creating directories
         self.update_progress(35, s["prog_dir"])
-        target_dir = Path(self.target_dir_var.get())
-        target_dir.mkdir(parents=True, exist_ok=True)
-        self.bin_dir.mkdir(parents=True, exist_ok=True)
-        self.apps_dir.mkdir(parents=True, exist_ok=True)
-        self.icons_dir.mkdir(parents=True, exist_ok=True)
-        (Path.home() / "Videos" / "Rewind").mkdir(parents=True, exist_ok=True)
-        (Path.home() / ".config" / "rewind").mkdir(parents=True, exist_ok=True)
         time.sleep(0.3)
-
-        # Step 3: Copying files
         self.update_progress(60, s["prog_copy"])
-        script_dir = Path(__file__).resolve().parent
 
-        src_bin = None
-        for cand in ["rewind-linux", "rewind.py", "rewind"]:
-            f = script_dir / cand
-            if f.exists():
-                src_bin = f
-                break
-
-        dest_bin = target_dir / "rewind"
-        if src_bin:
-            shutil.copy2(str(src_bin), str(dest_bin))
-        else:
-            # Fallback if binary is this script itself running standalone
-            dest_bin.write_text("#!/usr/bin/env python3\n")
-        dest_bin.chmod(0o755)
-
-        # Link to ~/.local/bin/rewind or /usr/local/bin/rewind
-        sym_bin = self.bin_dir / "rewind"
-        try:
-            if sym_bin.exists() or sym_bin.is_symlink():
-                sym_bin.unlink()
-            sym_bin.symlink_to(dest_bin)
-        except Exception:
-            try:
-                shutil.copy2(str(dest_bin), str(sym_bin))
-                sym_bin.chmod(0o755)
-            except Exception:
-                pass
-
-        self.installed_bin = sym_bin if sym_bin.exists() else dest_bin
-
-        # Copy icon
-        dest_icon = self.icons_dir / "rewind.png"
-        cfg_icon = Path.home() / ".config" / "rewind" / "icon.png"
-        src_icon = script_dir / "icon.png"
-        if src_icon.exists():
-            shutil.copy2(str(src_icon), str(dest_icon))
-            shutil.copy2(str(src_icon), str(cfg_icon))
-        elif LOGO_PNG_B64:
-            raw_icon = base64.b64decode(LOGO_PNG_B64)
-            dest_icon.write_bytes(raw_icon)
-            cfg_icon.write_bytes(raw_icon)
+        self.installed_bin = install_rewind_core(
+            target_dir_str=self.target_dir_var.get(),
+            create_desktop=self.var_desktop.get(),
+            create_menu=self.var_menu.get(),
+            create_autostart=self.var_autostart.get(),
+            lang_code=self.current_lang
+        )
 
         time.sleep(0.3)
-
-        # Step 4: Generating desktop shortcuts
         self.update_progress(80, s["prog_shortcuts"])
-        desktop_content = f"""[Desktop Entry]
-Name=Rewind
-GenericName=Replay Recorder
-Comment=Instant replay rolling buffer clip recorder
-Exec={self.installed_bin}
-Icon=rewind
-Terminal=false
-Type=Application
-Categories=AudioVideo;Recorder;Utility;
-Keywords=replay;clip;recording;gameplay;shadowplay;
-StartupNotify=true
-Actions=SaveClip;ToggleBuffer;
-
-[Desktop Action SaveClip]
-Name=Zapisz powtórkę
-Exec={self.installed_bin} --save
-
-[Desktop Action ToggleBuffer]
-Name=Wstrzymaj / Wznów bufor
-Exec={self.installed_bin} --toggle
-"""
-
-        # App Menu shortcut
-        if self.var_menu.get():
-            app_desktop = self.apps_dir / "rewind.desktop"
-            app_desktop.write_text(desktop_content, encoding="utf-8")
-            app_desktop.chmod(0o755)
-
-        # Desktop shortcut
-        if self.var_desktop.get():
-            self.desktop_dir.mkdir(parents=True, exist_ok=True)
-            desk_file = self.desktop_dir / "rewind.desktop"
-            desk_file.write_text(desktop_content, encoding="utf-8")
-            desk_file.chmod(0o755)
-            # Mark trusted for GNOME if gio is present
-            try:
-                subprocess.run(["gio", "set", str(desk_file), "metadata::trusted", "true"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except Exception:
-                pass
-
-        # Autostart shortcut
-        if self.var_autostart.get():
-            self.autostart_dir.mkdir(parents=True, exist_ok=True)
-            auto_file = self.autostart_dir / "rewind.desktop"
-            auto_desktop = desktop_content.replace(f"Exec={self.installed_bin}", f"Exec={self.installed_bin} --daemon")
-            auto_file.write_text(auto_desktop, encoding="utf-8")
-            auto_file.chmod(0o755)
-
         time.sleep(0.3)
-
-        # Step 5: Registering in system
         self.update_progress(95, s["prog_register"])
-        try:
-            subprocess.run(["update-desktop-database", str(self.apps_dir)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
-
-        # Save initial settings with language
-        try:
-            settings_json = Path.home() / ".config" / "rewind" / "rewind_settings.json"
-            if not settings_json.exists():
-                init_conf = f'{{"Language": "{self.current_lang}", "AutoStart": {str(self.var_autostart.get()).lower()}}}\n'
-                settings_json.write_text(init_conf, encoding="utf-8")
-        except Exception:
-            pass
-
         time.sleep(0.3)
         self.update_progress(100, s["prog_done_install"])
         time.sleep(0.4)
 
-        # Switch to Finish view
         self.root.after(100, self.finish_installation)
 
     def run_uninstall_worker(self):
         s = self.s
         time.sleep(0.2)
-        self.update_progress(25, s["prog_closing"])
-        try:
-            subprocess.run(["pkill", "-f", "rewind"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
+        self.update_progress(30, s["prog_closing"])
         time.sleep(0.3)
+        self.update_progress(60, s["prog_shortcuts"])
 
-        self.update_progress(55, s["prog_shortcuts"])
-        files_to_remove = [
-            self.bin_dir / "rewind",
-            self.apps_dir / "rewind.desktop",
-            self.icons_dir / "rewind.png",
-            self.desktop_dir / "rewind.desktop",
-            self.autostart_dir / "rewind.desktop",
-            Path(self.default_target) / "rewind"
-        ]
-
-        for f in files_to_remove:
-            try:
-                if f.exists() or f.is_symlink():
-                    f.unlink()
-            except Exception:
-                pass
+        uninstall_rewind_core()
 
         time.sleep(0.3)
-        self.update_progress(85, s["prog_register"])
-        try:
-            subprocess.run(["update-desktop-database", str(self.apps_dir)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
-
+        self.update_progress(90, s["prog_register"])
+        time.sleep(0.3)
         self.update_progress(100, s["prog_done_uninst"])
         time.sleep(0.4)
         self.root.after(100, self.finish_installation)
@@ -899,13 +936,70 @@ Exec={self.installed_bin} --toggle
         self.action_btn.bind("<Leave>", lambda e: self.action_btn.configure(bg=self.C_GREEN))
 
 
+def run_cli_install(target_dir=None, autostart=False):
+    """Clean terminal installer for headless or CLI environments."""
+    CYAN = '\033[0;36m'
+    GREEN = '\033[0;32m'
+    NC = '\033[0m'
+    print(f"{CYAN}=== Instalator Rewind v0.2 dla Linux (CLI Setup) ==={NC}")
+
+    if not target_dir:
+        home = Path.home()
+        if os.geteuid() == 0:
+            target_dir = "/usr/local/share/rewind"
+        else:
+            target_dir = str(home / ".local/share/rewind")
+
+    print(f"Instalowanie do: {target_dir}...")
+    bin_path = install_rewind_core(
+        target_dir_str=target_dir,
+        create_desktop=True,
+        create_menu=True,
+        create_autostart=autostart,
+        lang_code=detect_system_language()
+    )
+
+    print(f"{GREEN}✓ Rewind został pomyślnie zainstalowany!{NC}")
+    print(f"• Uruchomienie programu: kliknij ikonę Rewind na Pulpicie lub wpisz {CYAN}rewind{NC} w terminalu.")
+    print(f"• Skrót do zapisu klipu: {CYAN}F8{NC} (lub polecenie {CYAN}rewind --save{NC})")
+
+
+def run_cli_uninstall():
+    """Terminal uninstallation."""
+    CYAN = '\033[0;36m'
+    GREEN = '\033[0;32m'
+    NC = '\033[0m'
+    print(f"{CYAN}=== Deinstalator Rewind dla Linux (CLI) ==={NC}")
+    uninstall_rewind_core()
+    print(f"{GREEN}✓ Rewind został odinstalowany z systemu.{NC}")
+
+
 def main():
-    parser = argparse.ArgumentParser(description="Rewind Linux Graphical Installer")
-    parser.add_argument("--uninstall", action="store_true", help="Uruchom deinstalator programu")
+    parser = argparse.ArgumentParser(description="Rewind Linux Setup (GUI & CLI Installer)")
+    parser.add_argument("--uninstall", action="store_true", help="Odinstaluj program Rewind")
+    parser.add_argument("--cli", action="store_true", help="Uruchom w trybie tekstowym bez okna GUI")
+    parser.add_argument("--target", type=str, default="", help="Katalog docelowy dla trybu CLI")
+    parser.add_argument("--autostart", action="store_true", help="Włącz autostart w tle")
     args = parser.parse_args()
 
-    gui = RewindInstallerGui(is_uninstall=args.uninstall)
-    gui.root.mainloop()
+    has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
+
+    if args.cli or not has_display:
+        if args.uninstall:
+            run_cli_uninstall()
+        else:
+            run_cli_install(target_dir=args.target, autostart=args.autostart)
+        sys.exit(0)
+
+    try:
+        gui = RewindInstallerGui(is_uninstall=args.uninstall)
+        gui.root.mainloop()
+    except Exception as ex:
+        print(f"[RewindSetup] Nie można uruchomić interfejsu graficznego ({ex}). Przełączanie w tryb terminalowy...", file=sys.stderr)
+        if args.uninstall:
+            run_cli_uninstall()
+        else:
+            run_cli_install(target_dir=args.target, autostart=args.autostart)
 
 
 if __name__ == "__main__":

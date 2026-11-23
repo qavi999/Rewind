@@ -513,6 +513,7 @@ namespace ClipFlow {
         private Border _micVolContainer;
         private StackPanel _sysVolBox;
         private StackPanel _micVolBox;
+        private bool _isUpdatingAudioSliders;
         private List<Button> _soundPresetButtons = new List<Button>();
         private TextBlock _customSoundPathText;
 
@@ -1770,6 +1771,7 @@ namespace ClipFlow {
                 Margin = new Thickness(8, 0, 0, 0)
             };
             _sysVolSlider.ValueChanged += delegate {
+                if (_isUpdatingAudioSliders) return;
                 int val = (int)_sysVolSlider.Value;
                 _settings.SystemVolumePercent = val;
                 _sysVolLabel.Text = val + "%";
@@ -1812,6 +1814,7 @@ namespace ClipFlow {
                 Margin = new Thickness(8, 0, 0, 0)
             };
             _micVolSlider.ValueChanged += delegate {
+                if (_isUpdatingAudioSliders) return;
                 int val = (int)_micVolSlider.Value;
                 _settings.MicVolumePercent = val;
                 _micVolLabel.Text = val + "%";
@@ -2509,7 +2512,7 @@ namespace ClipFlow {
             }
         }
 
-        private FrameworkElement CreateRaycastNumericInput(string currentValue, string suffix, Action<string, TextBox> onCommit, int width, string hint) {
+        private FrameworkElement CreateRaycastNumericInput(string currentValue, string suffix, Action<string, TextBox> onCommit, int width, string hint, Action<string, TextBox> onLiveChange = null) {
             var border = new Border {
                 Background = _theme.InputBg,
                 BorderBrush = _theme.InputBorder,
@@ -2547,6 +2550,11 @@ namespace ClipFlow {
             tb.LostFocus += delegate {
                 border.BorderBrush = _theme.InputBorder;
                 onCommit(tb.Text, tb);
+            };
+            tb.TextChanged += delegate {
+                if (tb.IsFocused && onLiveChange != null) {
+                    onLiveChange(tb.Text, tb);
+                }
             };
             tb.KeyDown += delegate(object sender, KeyEventArgs e) {
                 if (e.Key == Key.Enter) {
@@ -2674,50 +2682,64 @@ namespace ClipFlow {
             if (_sysVolContainer == null || _micVolContainer == null) return;
 
             if (_settings.AdvancedMode) {
+                Action<string, TextBox> applySys = delegate(string val, TextBox box) {
+                    int vol;
+                    string clean = (val ?? "").ToLower().Replace("%", "").Trim();
+                    if (int.TryParse(clean, out vol)) {
+                        _settings.SystemVolumePercent = Math.Max(0, Math.Min(1000, vol));
+                        _settings.Save();
+                        _engine.UpdateAudioVolumes(_settings.SystemVolumePercent, _settings.MicVolumePercent);
+                    }
+                };
+
+                Action<string, TextBox> applyMic = delegate(string val, TextBox box) {
+                    int vol;
+                    string clean = (val ?? "").ToLower().Replace("%", "").Trim();
+                    if (int.TryParse(clean, out vol)) {
+                        _settings.MicVolumePercent = Math.Max(0, Math.Min(1000, vol));
+                        _settings.Save();
+                        _engine.UpdateAudioVolumes(_settings.SystemVolumePercent, _settings.MicVolumePercent);
+                    }
+                };
+
                 _sysVolContainer.Child = CreateRaycastNumericInput(
                     _settings.SystemVolumePercent.ToString(),
                     "%",
                     delegate(string val, TextBox box) {
-                        int vol;
-                        string clean = (val ?? "").ToLower().Replace("%", "").Trim();
-                        if (int.TryParse(clean, out vol)) {
-                            _settings.SystemVolumePercent = Math.Max(0, Math.Min(1000, vol));
-                            _settings.Save();
-                            _engine.UpdateAudioVolumes(_settings.SystemVolumePercent, _settings.MicVolumePercent);
-                        }
+                        applySys(val, box);
                         box.Text = _settings.SystemVolumePercent.ToString();
                     },
                     120,
-                    _L.CustomVolumeHint
+                    _L.CustomVolumeHint,
+                    applySys
                 );
 
                 _micVolContainer.Child = CreateRaycastNumericInput(
                     _settings.MicVolumePercent.ToString(),
                     "%",
                     delegate(string val, TextBox box) {
-                        int vol;
-                        string clean = (val ?? "").ToLower().Replace("%", "").Trim();
-                        if (int.TryParse(clean, out vol)) {
-                            _settings.MicVolumePercent = Math.Max(0, Math.Min(1000, vol));
-                            _settings.Save();
-                            _engine.UpdateAudioVolumes(_settings.SystemVolumePercent, _settings.MicVolumePercent);
-                        }
+                        applyMic(val, box);
                         box.Text = _settings.MicVolumePercent.ToString();
                     },
                     120,
-                    _L.CustomVolumeHint
+                    _L.CustomVolumeHint,
+                    applyMic
                 );
             } else {
-                if (_sysVolSlider != null && _sysVolLabel != null) {
-                    _sysVolSlider.Value = Math.Min(150, _settings.SystemVolumePercent);
-                    _sysVolLabel.Text = _settings.SystemVolumePercent + "%";
+                _isUpdatingAudioSliders = true;
+                try {
+                    if (_sysVolSlider != null && _sysVolLabel != null) {
+                        _sysVolSlider.Value = Math.Min(150, _settings.SystemVolumePercent);
+                        _sysVolLabel.Text = _settings.SystemVolumePercent + "%";
+                    }
+                    if (_micVolSlider != null && _micVolLabel != null) {
+                        _micVolSlider.Value = Math.Min(150, _settings.MicVolumePercent);
+                        _micVolLabel.Text = _settings.MicVolumePercent + "%";
+                    }
+                } finally {
+                    _isUpdatingAudioSliders = false;
                 }
                 _sysVolContainer.Child = _sysVolBox;
-
-                if (_micVolSlider != null && _micVolLabel != null) {
-                    _micVolSlider.Value = Math.Min(150, _settings.MicVolumePercent);
-                    _micVolLabel.Text = _settings.MicVolumePercent + "%";
-                }
                 _micVolContainer.Child = _micVolBox;
             }
         }

@@ -688,7 +688,11 @@ namespace ClipFlow {
                     }
                 }
                 if (micDev == null) {
-                    enumerator.GetDefaultAudioEndpoint(EDataFlow.eCapture, ERole.eMultimedia, out micDev);
+                    if (enumerator.GetDefaultAudioEndpoint(EDataFlow.eCapture, ERole.eMultimedia, out micDev) != 0 || micDev == null) {
+                        if (enumerator.GetDefaultAudioEndpoint(EDataFlow.eCapture, ERole.eCommunications, out micDev) != 0 || micDev == null) {
+                            enumerator.GetDefaultAudioEndpoint(EDataFlow.eCapture, ERole.eConsole, out micDev);
+                        }
+                    }
                 }
                 if (micDev != null) {
                     IntPtr pMicClientObj;

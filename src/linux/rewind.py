@@ -1365,8 +1365,19 @@ def run_gui(settings, engine):
                     s_entry.delete(0, "end")
                     s_entry.insert(0, str(settings.SystemVolumePercent))
 
+            def on_sys_key(event=None):
+                try:
+                    txt = s_entry.get().replace("%", "").strip()
+                    if txt:
+                        val = max(0, min(1000, int(txt)))
+                        settings.SystemVolumePercent = val
+                        settings.save()
+                except:
+                    pass
+
             s_btn = tk.Button(s_row, text="Zastosuj", font=("Segoe UI", 8, "bold"), bg=current_theme["accent"], fg="#FFFFFF", bd=0, padx=8, pady=2, cursor="hand2", command=apply_sys_vol)
             s_btn.pack(side="left", padx=4)
+            s_entry.bind("<KeyRelease>", on_sys_key)
             s_entry.bind("<Return>", lambda e: apply_sys_vol())
             s_entry.bind("<FocusOut>", lambda e: apply_sys_vol())
 
@@ -1390,40 +1401,55 @@ def run_gui(settings, engine):
                     m_entry.delete(0, "end")
                     m_entry.insert(0, str(settings.MicVolumePercent))
 
+            def on_mic_key(event=None):
+                try:
+                    txt = m_entry.get().replace("%", "").strip()
+                    if txt:
+                        val = max(0, min(1000, int(txt)))
+                        settings.MicVolumePercent = val
+                        settings.save()
+                except:
+                    pass
+
             m_btn = tk.Button(m_row, text="Zastosuj", font=("Segoe UI", 8, "bold"), bg=current_theme["accent"], fg="#FFFFFF", bd=0, padx=8, pady=2, cursor="hand2", command=apply_mic_vol)
             m_btn.pack(side="left", padx=4)
+            m_entry.bind("<KeyRelease>", on_mic_key)
             m_entry.bind("<Return>", lambda e: apply_mic_vol())
             m_entry.bind("<FocusOut>", lambda e: apply_mic_vol())
         else:
-            sys_scale = tk.Scale(
-                sysvol_container,
-                from_=0,
-                to=150,
-                orient="horizontal",
-                bg=current_theme["card"],
-                fg=current_theme["text"],
-                highlightthickness=0,
-                bd=0,
-                length=350,
-                command=lambda v: update_sys_vol(int(v))
-            )
-            sys_scale.set(min(150, settings.SystemVolumePercent))
-            sys_scale.pack(anchor="w")
+            is_updating = [True]
+            try:
+                sys_scale = tk.Scale(
+                    sysvol_container,
+                    from_=0,
+                    to=150,
+                    orient="horizontal",
+                    bg=current_theme["card"],
+                    fg=current_theme["text"],
+                    highlightthickness=0,
+                    bd=0,
+                    length=350,
+                    command=lambda v: update_sys_vol(int(v)) if not is_updating[0] else None
+                )
+                sys_scale.set(min(150, settings.SystemVolumePercent))
+                sys_scale.pack(anchor="w")
 
-            mic_scale = tk.Scale(
-                micvol_container,
-                from_=0,
-                to=150,
-                orient="horizontal",
-                bg=current_theme["card"],
-                fg=current_theme["text"],
-                highlightthickness=0,
-                bd=0,
-                length=350,
-                command=lambda v: update_mic_vol(int(v))
-            )
-            mic_scale.set(min(150, settings.MicVolumePercent))
-            mic_scale.pack(anchor="w")
+                mic_scale = tk.Scale(
+                    micvol_container,
+                    from_=0,
+                    to=150,
+                    orient="horizontal",
+                    bg=current_theme["card"],
+                    fg=current_theme["text"],
+                    highlightthickness=0,
+                    bd=0,
+                    length=350,
+                    command=lambda v: update_mic_vol(int(v)) if not is_updating[0] else None
+                )
+                mic_scale.set(min(150, settings.MicVolumePercent))
+                mic_scale.pack(anchor="w")
+            finally:
+                is_updating[0] = False
 
     update_audio_controls()
 

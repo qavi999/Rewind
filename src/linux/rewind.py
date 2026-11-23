@@ -36,10 +36,24 @@ APP_NAME = "Rewind"
 APP_VERSION = "v0.2"
 CONFIG_DIR = Path.home() / ".config" / "rewind"
 CONFIG_FILE = CONFIG_DIR / "rewind_settings.json"
-BUFFER_DIR = Path(tempfile.gettempdir()) / "rewind_buffer"
+BUFFER_DIR = Path(tempfile.gettempdir()) / f"rewind_buffer_{os.getuid()}"
 DEFAULT_CLIPS_DIR = Path.home() / "Videos" / "Rewind"
-SOCKET_FILE = Path(tempfile.gettempdir()) / f"rewind_{os.getuid()}.sock"
-LOCK_FILE = Path(tempfile.gettempdir()) / f"rewind_{os.getuid()}.lock"
+
+def get_runtime_dir():
+    """Get secure user-isolated runtime directory for sockets and locks (W-05)."""
+    xdg = os.environ.get("XDG_RUNTIME_DIR")
+    if xdg and os.path.isdir(xdg) and os.access(xdg, os.W_OK):
+        return Path(xdg)
+    fallback = Path(tempfile.gettempdir()) / f"rewind_run_{os.getuid()}"
+    try:
+        fallback.mkdir(mode=0o700, parents=True, exist_ok=True)
+    except Exception:
+        pass
+    return fallback
+
+RUNTIME_DIR = get_runtime_dir()
+SOCKET_FILE = RUNTIME_DIR / "rewind.sock"
+LOCK_FILE = RUNTIME_DIR / "rewind.lock"
 
 
 # =============================================================================
@@ -239,6 +253,29 @@ def detect_screen_resolution():
     return 1920, 1080, 0, 0
 
 
+def is_wayland_session():
+    """Detect if current session is running under Wayland (GNOME, KDE, Hyprland, Sway)."""
+    return bool(os.environ.get("WAYLAND_DISPLAY") or os.environ.get("XDG_SESSION_TYPE") == "wayland")
+
+
+def check_audio_source_valid(src_name):
+    """Check if pulse/pipewire audio source exists and can be captured (W-04)."""
+    if not src_name or src_name == "none":
+        return False
+    if src_name == "default" or src_name.endswith(".monitor"):
+        return True
+    if shutil.which("pactl"):
+        try:
+            out = subprocess.check_output(["pactl", "list", "sources", "short"], text=True, timeout=2)
+            for line in out.splitlines():
+                parts = line.split()
+                if len(parts) >= 2 and (parts[1] == src_name or src_name in parts[1]):
+                    return True
+        except Exception:
+            pass
+    return True
+
+
 def detect_audio_devices():
     """Detect PulseAudio/PipeWire default output monitor and mic."""
     sys_monitor = "default.monitor"
@@ -270,7 +307,8 @@ class BufferEngine:
         self.is_recording = False
         self.is_saving = False
         self.process = None
-        self.lock = threading.Lock()
+        # Use re-entrant RLock to prevent watchdog deadlock (Showstopper #2)
+        self.lock = threading.RLock()
         self.encoder = detect_encoder()
         self.record_start_time = 0
         self.status_listeners = []
@@ -343,7 +381,7 @@ class BufferEngine:
             # Build FFmpeg command
             cmd = ["ffmpeg", "-y", "-nostats", "-loglevel", "error"]
 
-            # Video input (X11 / XWayland)
+            # Video input (X11 & Wayland XWayland bridge)
             display = os.environ.get("DISPLAY", ":0.0")
             cmd.extend([
                 "-f", "x11grab",
@@ -353,35 +391,63 @@ class BufferEngine:
                 "-i", f"{display}+{ox},{oy}"
             ])
 
-            # Audio inputs
+            # Audio inputs with device validation (W-04)
             has_pulse = shutil.which("pactl") or shutil.which("pulseaudio") or shutil.which("pipewire")
-            use_audio = bool(has_pulse)
+            has_sys_audio = bool(has_pulse and check_audio_source_valid(sys_mon))
+            has_mic_audio = bool(has_pulse and check_audio_source_valid(mic_src))
 
-            if use_audio:
+            filters = []
+            audio_maps = []
+            audio_input_idx = 1
+
+            if has_sys_audio:
                 cmd.extend(["-f", "pulse", "-i", sys_mon])
+                sys_idx = audio_input_idx
+                audio_input_idx += 1
+            else:
+                sys_idx = None
+
+            if has_mic_audio:
                 cmd.extend(["-f", "pulse", "-i", mic_src])
+                mic_idx = audio_input_idx
+                audio_input_idx += 1
+            else:
+                mic_idx = None
+
+            # Setup audio filters & channels
+            if has_sys_audio and has_mic_audio:
                 if self.settings.SeparateAudioTracks:
-                    cmd.extend([
-                        "-filter_complex",
-                        f"[1:a]volume={sys_vol:.2f}[a_sys];[2:a]volume={mic_vol:.2f}[a_mic]",
-                        "-map", "0:v",
+                    filters.append(f"[{sys_idx}:a]volume={sys_vol:.2f}[a_sys]")
+                    filters.append(f"[{mic_idx}:a]volume={mic_vol:.2f}[a_mic]")
+                    audio_maps.extend([
                         "-map", "[a_sys]",
                         "-map", "[a_mic]",
                         "-metadata:s:a:0", "title=Game Audio",
                         "-metadata:s:a:1", "title=Microphone"
                     ])
                 else:
-                    cmd.extend([
-                        "-filter_complex",
-                        f"[1:a]volume={sys_vol:.2f}[a0];[2:a]volume={mic_vol:.2f}[a1];[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[aout]",
-                        "-map", "0:v",
-                        "-map", "[aout]"
-                    ])
-            else:
-                cmd.extend(["-map", "0:v"])
+                    filters.append(f"[{sys_idx}:a]volume={sys_vol:.2f}[a0]")
+                    filters.append(f"[{mic_idx}:a]volume={mic_vol:.2f}[a1]")
+                    filters.append(f"[a0][a1]amix=inputs=2:duration=first:dropout_transition=0[aout]")
+                    audio_maps.extend(["-map", "[aout]"])
+            elif has_sys_audio:
+                filters.append(f"[{sys_idx}:a]volume={sys_vol:.2f}[aout]")
+                audio_maps.extend(["-map", "[aout]"])
+            elif has_mic_audio:
+                filters.append(f"[{mic_idx}:a]volume={mic_vol:.2f}[aout]")
+                audio_maps.extend(["-map", "[aout]"])
 
-            # Video encoder settings
-            if self.encoder == "h264_nvenc":
+            # Video encoder & VAAPI hardware filter integration (W-08)
+            v_map = "0:v"
+            if self.encoder == "h264_vaapi":
+                filters.append("[0:v]format=nv12,hwupload[vout]")
+                v_map = "[vout]"
+                cmd.extend([
+                    "-vaapi_device", "/dev/dri/renderD128",
+                    "-c:v", "h264_vaapi",
+                    "-b:v", bitrate
+                ])
+            elif self.encoder == "h264_nvenc":
                 cmd.extend([
                     "-c:v", "h264_nvenc",
                     "-preset", "p1",
@@ -390,11 +456,10 @@ class BufferEngine:
                     "-maxrate", bitrate,
                     "-bufsize", "8M"
                 ])
-            elif self.encoder == "h264_vaapi":
+            elif self.encoder == "h264_qsv":
                 cmd.extend([
-                    "-vaapi_device", "/dev/dri/renderD128",
-                    "-vf", "format=nv12,hwupload",
-                    "-c:v", "h264_vaapi",
+                    "-c:v", "h264_qsv",
+                    "-preset", "veryfast",
                     "-b:v", bitrate
                 ])
             else:
@@ -406,8 +471,13 @@ class BufferEngine:
                     "-pix_fmt", "yuv420p"
                 ])
 
-            # Audio codec & segmenting
-            if use_audio:
+            if filters:
+                cmd.extend(["-filter_complex", ";".join(filters)])
+
+            cmd.extend(["-map", v_map])
+
+            if audio_maps:
+                cmd.extend(audio_maps)
                 cmd.extend(["-c:a", "aac", "-b:a", "192k"])
 
             cmd.extend([
@@ -430,7 +500,8 @@ class BufferEngine:
                 self.record_start_time = time.time()
                 self.is_recording = True
                 enc_name = self.encoder.replace("h264_", "").upper()
-                self.notify_status(True, f"Bufor aktywny ({enc_name} + Audio)")
+                sess_info = "Wayland" if is_wayland_session() else "X11"
+                self.notify_status(True, f"Bufor aktywny ({enc_name} + Audio, {sess_info})")
             except Exception as e:
                 self.is_recording = False
                 self.notify_status(False, f"Błąd uruchamiania bufora: {e}")
@@ -438,16 +509,21 @@ class BufferEngine:
     def stop(self):
         with self.lock:
             self.is_recording = False
-            if self.process:
+            p = self.process
+            self.process = None
+
+        if p:
+            try:
+                p.terminate()
+                p.wait(timeout=1.0)
+            except Exception:
                 try:
-                    self.process.terminate()
-                    self.process.wait(timeout=1.0)
+                    p.kill()
+                    p.wait(timeout=1.0)  # Prevent zombie <defunct> processes (W-03)
                 except Exception:
-                    try:
-                        self.process.kill()
-                    except Exception:
-                        pass
-                self.process = None
+                    pass
+
+        with self.lock:
             self.clean_buffer_dir()
             self.notify_status(False, "Bufor zatrzymany")
 
@@ -473,6 +549,13 @@ class BufferEngine:
                                 newest = max(files, key=lambda f: f.stat().st_mtime)
                                 if time.time() - newest.stat().st_mtime > 10.0:
                                     self.stop()
+                                    self.start()
+                                    continue
+
+                    # Trim ring buffer
+                    self._trim_buffer()
+            except Exception:
+                pass
                                     self.start()
                                     continue
 
@@ -536,16 +619,22 @@ class BufferEngine:
         threading.Thread(target=_worker, daemon=True).start()
 
     def _execute_save_clip(self, custom_duration=0):
-        files = sorted(
+        raw_files = sorted(
             [f for f in BUFFER_DIR.glob("seg_*.ts") if f.stat().st_size > 2048],
             key=lambda f: f.name
         )
 
-        if not files:
+        if not raw_files:
             show_notification("Rewind", "Brak nagranych danych w buforze (odczekaj kilka sekund).")
             return
 
-        newest = max(files, key=lambda f: f.stat().st_mtime)
+        # Exclude active segment being currently written by FFmpeg to prevent EOF / PTS glitches (Showstopper #3)
+        if len(raw_files) >= 2:
+            completed_files = raw_files[:-1]
+        else:
+            completed_files = raw_files
+
+        newest = max(completed_files, key=lambda f: f.stat().st_mtime)
         if time.time() - newest.stat().st_mtime > 8.0:
             show_notification("Rewind", "Bufor nie zawierał świeżych klatek. Trwa restart bufora.")
             self.stop()
@@ -553,8 +642,12 @@ class BufferEngine:
             return
 
         target_dur = custom_duration if custom_duration > 0 else self.settings.ClipDuration
-        needed_count = math.ceil(target_dur / 2.0) + 1
-        chosen = files[-needed_count:]
+        needed_count = math.ceil(target_dur / 2.0)
+        chosen = completed_files[-needed_count:]
+
+        if not chosen:
+            show_notification("Rewind", "Bufor przygotowuje pierwsze segmenty, spróbuj za 2 sekundy.")
+            return
 
         # Create concat list
         concat_file = BUFFER_DIR / f"concat_{int(time.time()*1000)}.txt"
@@ -568,17 +661,19 @@ class BufferEngine:
         timestamp = time.strftime("%Y-%m-%d_%H-%M-%S")
         output_clip = clips_dir / f"Clip_{timestamp}.mp4"
 
+        # Concat with -map 0 to preserve all audio tracks including microphone (Showstopper #4)
         cmd = [
             "ffmpeg", "-y", "-nostats", "-loglevel", "error",
             "-f", "concat", "-safe", "0",
             "-i", str(concat_file),
+            "-map", "0",
             "-c", "copy",
             "-fflags", "+genpts",
             "-avoid_negative_ts", "make_zero",
             str(output_clip)
         ]
 
-        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=12)
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
 
         try:
             concat_file.unlink()
@@ -691,13 +786,17 @@ class IpcServer:
 
     def start(self):
         try:
-            if SOCKET_FILE.exists():
+            if SOCKET_FILE.exists() or SOCKET_FILE.is_socket():
                 SOCKET_FILE.unlink()
         except Exception:
             pass
 
         self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         self.sock.bind(str(SOCKET_FILE))
+        try:
+            os.chmod(str(SOCKET_FILE), 0o600)  # Secure socket permissions (W-05)
+        except Exception:
+            pass
         self.sock.listen(5)
         self.running = True
 
@@ -737,7 +836,20 @@ class IpcServer:
             elif data == "SHOW":
                 if self.on_show_window:
                     self.on_show_window()
-                conn.sendall(b"OK:SHOWN\n")
+                    conn.sendall(b"OK:SHOWN\n")
+                else:
+                    # Daemon process running headless (Showstopper #5)
+                    conn.sendall(b"ERR:HEADLESS\n")
+            elif data == "STOP_FOR_GUI":
+                if not self.on_show_window:
+                    conn.sendall(b"OK:STOPPING\n")
+                    def _stop_daemon():
+                        time.sleep(0.3)
+                        self.engine.stop()
+                        os._exit(0)
+                    threading.Thread(target=_stop_daemon, daemon=True).start()
+                else:
+                    conn.sendall(b"ERR:HAS_GUI\n")
             elif data == "STATUS":
                 status = "ACTIVE" if self.engine.is_recording else "PAUSED"
                 conn.sendall(f"STATUS:{status}:{self.engine.encoder}\n".encode("utf-8"))
@@ -802,6 +914,18 @@ def start_x11_hotkey_listener(engine):
 
             x11.XCloseDisplay.restype = ctypes.c_int
             x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+
+            # Custom error handler so BadAccess hotkey conflicts don't terminate process (W-06)
+            XErrorHandler = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
+            def _x_error_handler(display, error_event):
+                return 0
+            _c_error_handler = XErrorHandler(_x_error_handler)
+            try:
+                x11.XSetErrorHandler.restype = ctypes.c_void_p
+                x11.XSetErrorHandler.argtypes = [XErrorHandler]
+                x11.XSetErrorHandler(_c_error_handler)
+            except Exception:
+                pass
 
             display = x11.XOpenDisplay(None)
             if not display:
@@ -880,7 +1004,7 @@ def start_x11_hotkey_listener(engine):
 # =============================================================================
 # RAYCAST-INSPIRED TKINTER GRAPHICAL USER INTERFACE
 # =============================================================================
-def run_gui(settings, engine):
+def run_gui(settings, engine, ipc=None):
     import tkinter as tk
     from tkinter import ttk, filedialog, messagebox
 
@@ -888,6 +1012,17 @@ def run_gui(settings, engine):
     root.title("Rewind - Natychmiastowe powtórki")
     root.geometry("960x640")
     root.minsize(880, 580)
+
+    # Register show_window handler for IPC (Showstopper #5)
+    if ipc:
+        def show_window():
+            try:
+                root.deiconify()
+                root.lift()
+                root.focus_force()
+            except Exception:
+                pass
+        ipc.on_show_window = show_window
 
     # Set icon if available
     icon_path = CONFIG_DIR / "icon.png"
@@ -1231,13 +1366,25 @@ def run_gui(settings, engine):
                 messagebox.showerror("Błąd", "Czas końca musi być większy niż czas początku (>= 0).")
                 return
 
-            success, res = engine.trim_clip(file_path, start_val, end_val)
-            if success:
-                dlg.destroy()
-                refresh_clips_list()
-                show_notification("Rewind", f"✂️ Klip przycięty: {Path(res).name}")
-            else:
-                messagebox.showerror("Błąd przycinania", res)
+            # Asynchronous trimming in background thread to prevent Tkinter freezing (W-10)
+            save_btn.config(text="⏳ Przycinanie...", state="disabled")
+            cancel_btn.config(state="disabled")
+
+            def _async_trim():
+                success, res = engine.trim_clip(file_path, start_val, end_val)
+                def _finish():
+                    if dlg.winfo_exists():
+                        save_btn.config(text="⚡ Zapisz przycięty klip", state="normal")
+                        cancel_btn.config(state="normal")
+                        if success:
+                            dlg.destroy()
+                            refresh_clips_list()
+                            show_notification("Rewind", f"✂️ Klip przycięty: {Path(res).name}")
+                        else:
+                            messagebox.showerror("Błąd przycinania", res)
+                root.after(0, _finish)
+
+            threading.Thread(target=_async_trim, daemon=True).start()
 
         save_btn = tk.Button(btn_row, text="⚡ Zapisz przycięty klip", font=("Segoe UI", 9, "bold"), fg="#FFFFFF", bg=current_theme["accent"], bd=0, padx=12, pady=6, cursor="hand2", command=on_save_trim)
         save_btn.pack(side="right")
@@ -1807,41 +1954,32 @@ def main():
     # Handle CLI client commands
     if args.save:
         res = send_ipc_command("SAVE")
-        if res:
+        if res and res.startswith("OK"):
             print("[Rewind] Polecenie zapisu wysłane do działającej instancji.")
             sys.exit(0)
         else:
-            print("[Rewind] Rewind nie jest uruchomiony w tle! Uruchamianie...", file=sys.stderr)
-            # Fallback: start engine, wait and save
-            s = AppSettings.load()
-            eng = BufferEngine(s)
-            eng.start()
-            time.sleep(2)
-            eng.save_clip(s.ClipDuration)
-            time.sleep(1)
-            eng.stop()
-            sys.exit(0)
+            print("[Rewind] Błąd: Bufor Rewind nie jest aktywny w tle!", file=sys.stderr)
+            print("[Rewind] Uruchom program (np. 'rewind' lub 'rewind --daemon'), aby rozpocząć rejestrację.", file=sys.stderr)
+            sys.exit(1)
 
     if args.save_long:
         res = send_ipc_command("SAVE_LONG")
-        if res:
+        if res and res.startswith("OK"):
             print("[Rewind] Polecenie zapisu dłuższego klipu wysłane do działającej instancji.")
             sys.exit(0)
         else:
-            print("[Rewind] Rewind nie jest uruchomiony w tle! Uruchamianie...", file=sys.stderr)
-            s = AppSettings.load()
-            eng = BufferEngine(s)
-            eng.start()
-            time.sleep(2)
-            eng.save_clip(s.SecondaryClipDuration)
-            time.sleep(1)
-            eng.stop()
-            sys.exit(0)
+            print("[Rewind] Błąd: Bufor Rewind nie jest aktywny w tle!", file=sys.stderr)
+            print("[Rewind] Uruchom program (np. 'rewind' lub 'rewind --daemon'), aby rozpocząć rejestrację.", file=sys.stderr)
+            sys.exit(1)
 
     if args.toggle:
         res = send_ipc_command("TOGGLE")
-        print(f"[Rewind] Stan bufora przełączony: {res}")
-        sys.exit(0)
+        if res:
+            print(f"[Rewind] Stan bufora przełączony: {res}")
+            sys.exit(0)
+        else:
+            print("[Rewind] Bufor jest nieaktywny (brak działającej instancji).", file=sys.stderr)
+            sys.exit(1)
 
     if args.status:
         res = send_ipc_command("STATUS")
@@ -1851,10 +1989,15 @@ def main():
             print("[Rewind] Bufor jest nieaktywny (brak działającej instancji).")
         sys.exit(0)
 
-    # Check if another GUI instance is already running
-    if send_ipc_command("SHOW"):
+    # Check if another instance is already running
+    show_resp = send_ipc_command("SHOW")
+    if show_resp == "OK:SHOWN":
         print("[Rewind] Istniejąca instancja programu została wywołana na pierwszy plan.")
         sys.exit(0)
+    elif show_resp == "ERR:HEADLESS":
+        print("[Rewind] Wykryto działający bufor w tle (daemon). Zatrzymywanie daemona i uruchamianie GUI...")
+        send_ipc_command("STOP_FOR_GUI")
+        time.sleep(0.5)
 
     # Initialize assets and settings
     ensure_assets()
@@ -1868,7 +2011,7 @@ def main():
     # Global Hotkey listener for X11
     start_x11_hotkey_listener(engine)
 
-    # Handle SIGUSR1 (allows `killall -USR1 rewind` to save clip)
+    # Handle SIGUSR1 (allows `killall -USR1 rewind` or `pkill -USR1 -f rewind` to save clip)
     signal.signal(signal.SIGUSR1, lambda sig, frame: engine.save_clip())
 
     if args.daemon:
@@ -1883,7 +2026,7 @@ def main():
 
     # Try running GUI, fallback to daemon if DISPLAY is missing
     try:
-        run_gui(settings, engine)
+        run_gui(settings, engine, ipc)
     except Exception as e:
         print(f"[Rewind] Środowisko graficzne niedostępne ({e}). Uruchamianie w trybie daemon...", file=sys.stderr)
         engine.start()

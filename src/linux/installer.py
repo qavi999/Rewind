@@ -349,12 +349,12 @@ def install_rewind_core(target_dir_str, create_desktop, create_menu, create_auto
         dest_icon.write_bytes(raw_icon)
         cfg_icon.write_bytes(raw_icon)
 
-    # Desktop shortcut template
+    # Desktop shortcut template with quoted binary paths
     desktop_content = f"""[Desktop Entry]
 Name=Rewind
 GenericName=Replay Recorder
 Comment=Instant replay rolling buffer clip recorder
-Exec={installed_bin}
+Exec="{installed_bin}"
 Icon=rewind
 Terminal=false
 Type=Application
@@ -365,11 +365,11 @@ Actions=SaveClip;ToggleBuffer;
 
 [Desktop Action SaveClip]
 Name=Zapisz powtórkę
-Exec={installed_bin} --save
+Exec="{installed_bin}" --save
 
 [Desktop Action ToggleBuffer]
 Name=Wstrzymaj / Wznów bufor
-Exec={installed_bin} --toggle
+Exec="{installed_bin}" --toggle
 """
 
     # 1. Application Menu (.desktop)
@@ -393,7 +393,7 @@ Exec={installed_bin} --toggle
     if create_autostart:
         autostart_dir.mkdir(parents=True, exist_ok=True)
         auto_file = autostart_dir / "rewind.desktop"
-        auto_desktop = desktop_content.replace(f"Exec={installed_bin}", f"Exec={installed_bin} --daemon")
+        auto_desktop = desktop_content.replace(f'Exec="{installed_bin}"', f'Exec="{installed_bin}" --daemon')
         auto_file.write_text(auto_desktop, encoding="utf-8")
         auto_file.chmod(0o755)
 
@@ -416,7 +416,7 @@ Exec={installed_bin} --toggle
 
 
 def uninstall_rewind_core():
-    """Core uninstallation logic."""
+    """Core uninstallation logic (W-02)."""
     home = Path.home()
     if os.geteuid() == 0:
         target_dir = Path("/usr/local/share/rewind")
@@ -439,9 +439,29 @@ def uninstall_rewind_core():
         user_auto = home / ".config/autostart/rewind.desktop"
 
     try:
-        subprocess.run(["pkill", "-f", "rewind"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["pkill", "-f", "([r]ewind|[r]ewind-linux|[R]ewindSetup)"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
+
+    # Clean runtime sockets & locks
+    runtime_dir = os.environ.get("XDG_RUNTIME_DIR")
+    if runtime_dir:
+        for f in Path(runtime_dir).glob("rewind*"):
+            try:
+                if f.is_file() or f.is_socket():
+                    f.unlink()
+                elif f.is_dir() and "rewind" in f.name:
+                    shutil.rmtree(str(f), ignore_errors=True)
+            except Exception:
+                pass
+    for f in Path(tempfile.gettempdir()).glob("rewind*"):
+        try:
+            if f.is_file() or f.is_socket():
+                f.unlink()
+            elif f.is_dir() and "rewind" in f.name:
+                shutil.rmtree(str(f), ignore_errors=True)
+        except Exception:
+            pass
 
     for f in [bin_file, apps_file, icon_file, user_desk, user_auto]:
         try:

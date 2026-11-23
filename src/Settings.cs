@@ -76,9 +76,25 @@ namespace ClipFlow {
         public string Language { get; set; }
         public int SelectedDisplayIndex { get; set; }
         public string SelectedDisplayDevice { get; set; }
+        public bool AdvancedMode { get; set; }
+        public bool SeparateAudioTracks { get; set; }
+        public bool SecondaryHotkeyEnabled { get; set; }
+        public string SecondaryHotkey { get; set; }
+        public int SecondaryClipDuration { get; set; }
+        public bool StorageLimitEnabled { get; set; }
+        public int MaxStorageLimitGB { get; set; }
+        public int MaxClipAgeDays { get; set; }
 
         public AppSettings() {
             Language = "pl";
+            AdvancedMode = false;
+            SeparateAudioTracks = false;
+            SecondaryHotkeyEnabled = true;
+            SecondaryHotkey = "F7";
+            SecondaryClipDuration = 120;
+            StorageLimitEnabled = false;
+            MaxStorageLimitGB = 25;
+            MaxClipAgeDays = 0;
             SelectedDisplayIndex = 0;
             SelectedDisplayDevice = "";
             ClipDuration = 30;
@@ -148,8 +164,8 @@ namespace ClipFlow {
                     var serializer = new JavaScriptSerializer();
                     var settings = serializer.Deserialize<AppSettings>(json);
                     if (settings != null) {
-                        if (settings.SystemVolumePercent <= 0) settings.SystemVolumePercent = 100;
-                        if (settings.MicVolumePercent <= 0) settings.MicVolumePercent = 100;
+                        if (settings.SystemVolumePercent < 0 || settings.SystemVolumePercent > 1000) settings.SystemVolumePercent = 100;
+                        if (settings.MicVolumePercent < 0 || settings.MicVolumePercent > 1000) settings.MicVolumePercent = 100;
                         if (string.IsNullOrEmpty(settings.SelectedMicId)) settings.SelectedMicId = "default";
                         if (settings.SelectedDisplayDevice == null) settings.SelectedDisplayDevice = "";
                         if (settings.SelectedDisplayIndex < 0) settings.SelectedDisplayIndex = 0;
@@ -157,6 +173,14 @@ namespace ClipFlow {
                         if (string.IsNullOrEmpty(settings.SoundPreset)) settings.SoundPreset = "Default";
                         if (settings.CustomSoundPath == null) settings.CustomSoundPath = "";
                         if (string.IsNullOrEmpty(settings.PerformanceProfile)) settings.PerformanceProfile = "Balanced";
+                        if (settings.ClipDuration < 5 || settings.ClipDuration > 600) settings.ClipDuration = 30;
+                        if (settings.Fps < 15 || settings.Fps > 360) settings.Fps = 60;
+                        if (string.IsNullOrEmpty(settings.Bitrate)) settings.Bitrate = "12M";
+                        if (string.IsNullOrEmpty(settings.Hotkey)) settings.Hotkey = "F8";
+                        if (string.IsNullOrEmpty(settings.SecondaryHotkey)) settings.SecondaryHotkey = "F7";
+                        if (settings.SecondaryClipDuration < 5 || settings.SecondaryClipDuration > 600) settings.SecondaryClipDuration = 120;
+                        if (settings.MaxStorageLimitGB <= 0) settings.MaxStorageLimitGB = 25;
+                        if (string.IsNullOrEmpty(settings.Language)) settings.Language = "pl";
 
                         settings.AutoStart = AutostartHelper.IsAutostartEnabled();
 

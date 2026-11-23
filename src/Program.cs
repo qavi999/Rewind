@@ -32,7 +32,13 @@ namespace ClipFlow {
             _singleInstanceMutex = new Mutex(true, "Global\\Rewind_SingleInstance_App", out isNewInstance);
 
             if (!isNewInstance) {
-                // Bring existing instance to front
+                // Wake up running instance even if hidden in system tray
+                uint msg = NativeMethods.RegisterWindowMessage(NativeMethods.REWIND_SHOW_MESSAGE_NAME);
+                if (msg != 0) {
+                    NativeMethods.PostMessage(NativeMethods.HWND_BROADCAST, msg, IntPtr.Zero, IntPtr.Zero);
+                }
+
+                // Also try bringing any visible window to front as fallback
                 Process current = Process.GetCurrentProcess();
                 foreach (Process p in Process.GetProcessesByName(current.ProcessName)) {
                     if (p.Id != current.Id && p.MainWindowHandle != IntPtr.Zero) {

@@ -50,6 +50,14 @@ namespace ClipFlow {
         public string VideoFolderSub { get; set; }
         public string VideoFolderBtn { get; set; }
 
+        public string AdvancedModeTitle { get; set; }
+        public string AdvancedModeSub { get; set; }
+        public string CustomDurationHint { get; set; }
+        public string CustomFpsHint { get; set; }
+        public string CustomBitrateHint { get; set; }
+        public string CustomHotkeyHint { get; set; }
+        public string CustomVolumeHint { get; set; }
+
         // Audio Settings
         public string AudioPlaySoundTitle { get; set; }
         public string AudioPlaySoundSub { get; set; }
@@ -65,10 +73,37 @@ namespace ClipFlow {
         public string AudioMicVolSub { get; set; }
         public string AudioMicDeviceTitle { get; set; }
         public string AudioMicDeviceSub { get; set; }
+        public string AudioSeparateTracksTitle { get; set; }
+        public string AudioSeparateTracksSub { get; set; }
 
         // Hotkeys Settings
         public string HotkeyTitle { get; set; }
         public string HotkeySub { get; set; }
+        public string HotkeySecondaryTitle { get; set; }
+        public string HotkeySecondarySub { get; set; }
+        public string HotkeySecondaryKeyTitle { get; set; }
+        public string HotkeySecondaryKeySub { get; set; }
+        public string HotkeySecondaryDurationTitle { get; set; }
+        public string HotkeySecondaryDurationSub { get; set; }
+
+        // Storage Management
+        public string StorageTitle { get; set; }
+        public string StorageSub { get; set; }
+        public string StorageLimitToggle { get; set; }
+        public string StorageAgeTitle { get; set; }
+        public string StorageAgeSub { get; set; }
+
+        // Trimmer
+        public string ClipsTrimBtn { get; set; }
+        public string TrimDialogTitle { get; set; }
+        public string TrimStartLabel { get; set; }
+        public string TrimEndLabel { get; set; }
+        public string TrimSaveBtn { get; set; }
+        public string TrimCancelBtn { get; set; }
+        public string TrimInvalidStart { get; set; }
+        public string TrimInvalidEnd { get; set; }
+        public string TrimError { get; set; }
+        public string TrimSuccess { get; set; }
 
         // System Settings
         public string SystemLangTitle { get; set; }
@@ -159,7 +194,7 @@ namespace ClipFlow {
                 NavVideo = "📹  Wideo i bufor",
                 NavAudio = "🎧  Dźwięk i mikser",
                 NavHotkeys = "⌨️  Skróty klawiszowe",
-                NavSystem = "⚙️  System i autostart",
+                NavSystem = "⚙️  Ustawienia",
                 NavAbout = "ℹ️  O programie",
 
                 HeroHotkeyPrefix = "SKRÓT: ",
@@ -198,6 +233,14 @@ namespace ClipFlow {
                 VideoFolderSub = "Katalog, w którym zapisywane są gotowe pliki MP4.",
                 VideoFolderBtn = "Zmień folder...",
 
+                AdvancedModeTitle = "Odblokuj ustawienia zaawansowane",
+                AdvancedModeSub = "Zamienia suwaki i sztywne przyciski na pola tekstowe, w których możesz wpisać dowolne wartości FPS, bufora, bitrate oraz głośności.",
+                CustomDurationHint = "Wpisz długość w sekundach (np. 10, 45, 90, 180s)",
+                CustomFpsHint = "Wpisz dowolne FPS (np. 75, 144, 165, 240, 360)",
+                CustomBitrateHint = "Wpisz bitrate w Mbps (np. 12, 20, 35, 50 Mbps)",
+                CustomHotkeyHint = "Wpisz skrót (np. F7, F11, Alt+F10, Ctrl+Shift+S)",
+                CustomVolumeHint = "Wpisz głośność w % (np. 50, 100, 150, 200, 300%)",
+
                 AudioPlaySoundTitle = "Dźwięk potwierdzenia zapisu",
                 AudioPlaySoundSub = "Krótki sygnał audio potwierdzający przechwycenie powtórki.",
                 AudioPresetTitle = "Wybór profilu dźwiękowego",
@@ -212,9 +255,34 @@ namespace ClipFlow {
                 AudioMicVolSub = "Rejestrowanie Twojego głosu w czasie rzeczywistym.",
                 AudioMicDeviceTitle = "Urządzenie mikrofonowe",
                 AudioMicDeviceSub = "Wybierz mikrofon, który ma być nagrywany.",
+                AudioSeparateTracksTitle = "Osobne ścieżki audio (Multi-track)",
+                AudioSeparateTracksSub = "Zapisuj dźwięk z gry i mikrofon na oddzielnych ścieżkach w pliku MP4.",
 
                 HotkeyTitle = "Klawisz zapisu powtórki",
                 HotkeySub = "Globalny skrót klawiszowy działający we wszystkich grach pełnoekranowych.",
+                HotkeySecondaryTitle = "Drugi skrót (Długi klip)",
+                HotkeySecondarySub = "Dodatkowy skrót do zapisu dłuższej powtórki (np. całej rundy).",
+                HotkeySecondaryKeyTitle = "Klawisz drugiego skrótu",
+                HotkeySecondaryKeySub = "Wybierz skrót klawiszowy dla długiej powtórki.",
+                HotkeySecondaryDurationTitle = "Długość drugiej powtórki",
+                HotkeySecondaryDurationSub = "Czas bufora w sekundach dla drugiego skrótu klawiszowego.",
+
+                StorageTitle = "Zarządzanie miejscem na dysku",
+                StorageSub = "Automatyczne pilnowanie wolnej przestrzeni na dysku z powtórkami.",
+                StorageLimitToggle = "Ogranicz rozmiar folderu powtórek",
+                StorageAgeTitle = "Automatyczne usuwanie starych klipów",
+                StorageAgeSub = "Usuwaj powtórki starsze niż określona liczba dni.",
+
+                ClipsTrimBtn = "✂️ Przytnij",
+                TrimDialogTitle = "Szybkie przycinanie klipu",
+                TrimStartLabel = "Początek (sekundy):",
+                TrimEndLabel = "Koniec (sekundy):",
+                TrimSaveBtn = "⚡ Zapisz przycięty klip",
+                TrimCancelBtn = "Anuluj",
+                TrimInvalidStart = "Nieprawidłowy czas początku (musi być >= 0).",
+                TrimInvalidEnd = "Czas końca musi być większy niż czas początku.",
+                TrimError = "Błąd podczas przycinania pliku.",
+                TrimSuccess = "Klip został pomyślnie przycięty!",
 
                 SystemLangTitle = "Język aplikacji",
                 SystemLangSub = "Wybierz język interfejsu programu Rewind.",
@@ -236,7 +304,7 @@ namespace ClipFlow {
                 AboutFootprintTitle = "Narzut zasobów na system",
                 AboutFootprintSub = "Zminimalizowana praca procesora oraz pamięci RAM podczas grania.",
 
-                TrayHeader = "Rewind v0.1",
+                TrayHeader = "Rewind v0.2",
                 TrayBufferActive = "    ● Bufor aktywny (NVENC)",
                 TrayBufferPaused = "    ○ Bufor wstrzymany",
                 TraySaveClip = "⚡  Zapisz powtórkę",
@@ -262,8 +330,8 @@ namespace ClipFlow {
                 SectionHeaderAudioSub = "Konfiguracja nagrywania dźwięku z gry, mikrofonu oraz personalizacja dźwięku powtórki.",
                 SectionHeaderHotkeys = "Skróty klawiszowe",
                 SectionHeaderHotkeysSub = "Globalne klawisze wyzwalające natychmiastowe przechwycenie powtórki.",
-                SectionHeaderSystem = "System, wygląd i powiadomienia",
-                SectionHeaderSystemSub = "Personalizacja wyglądu aplikacji, powiadomień HUD oraz autostartu z Windows.",
+                SectionHeaderSystem = "Ustawienia aplikacji",
+                SectionHeaderSystemSub = "Tryb zaawansowany, personalizacja wyglądu, powiadomienia HUD oraz autostart.",
 
                 VideoGpuTitle = "Sprzętowa akceleracja kodowania",
                 VideoGpuSub = "Koder GPU odciąża procesor CPU do < 0.5%, gwarantując zero spadków FPS w grach.",
@@ -296,7 +364,7 @@ namespace ClipFlow {
                 NavVideo = "📹  Video & Buffer",
                 NavAudio = "🎧  Audio & Mixer",
                 NavHotkeys = "⌨️  Hotkeys",
-                NavSystem = "⚙️  System & Startup",
+                NavSystem = "⚙️  Settings",
                 NavAbout = "ℹ️  About Rewind",
 
                 HeroHotkeyPrefix = "HOTKEY: ",
@@ -335,6 +403,14 @@ namespace ClipFlow {
                 VideoFolderSub = "Directory where MP4 video replays are stored.",
                 VideoFolderBtn = "Change Folder...",
 
+                AdvancedModeTitle = "Unlock Advanced Settings",
+                AdvancedModeSub = "Replaces fixed buttons and sliders with custom text fields for arbitrary FPS, buffer duration, bitrate, and audio volume.",
+                CustomDurationHint = "Enter duration in seconds (e.g. 10, 45, 90, 180s)",
+                CustomFpsHint = "Enter custom FPS (e.g. 75, 144, 165, 240, 360)",
+                CustomBitrateHint = "Enter bitrate in Mbps (e.g. 12, 20, 35, 50 Mbps)",
+                CustomHotkeyHint = "Enter hotkey (e.g. F7, F11, Alt+F10, Ctrl+Shift+S)",
+                CustomVolumeHint = "Enter volume in % (e.g. 50, 100, 150, 200, 300%)",
+
                 AudioPlaySoundTitle = "Capture confirmation sound",
                 AudioPlaySoundSub = "Short acoustic cue confirming a replay has been saved.",
                 AudioPresetTitle = "Sound effect preset",
@@ -349,9 +425,34 @@ namespace ClipFlow {
                 AudioMicVolSub = "Real-time microphone input captured alongside game audio.",
                 AudioMicDeviceTitle = "Microphone device",
                 AudioMicDeviceSub = "Select the microphone device to capture.",
+                AudioSeparateTracksTitle = "Separate Audio Tracks (Multi-track)",
+                AudioSeparateTracksSub = "Record game audio and microphone on independent tracks in the MP4 file.",
 
                 HotkeyTitle = "Save replay hotkey",
                 HotkeySub = "Global system-wide hotkey working across all full-screen games.",
+                HotkeySecondaryTitle = "Secondary Hotkey (Long Clip)",
+                HotkeySecondarySub = "Additional hotkey to capture a longer replay (e.g. an entire round).",
+                HotkeySecondaryKeyTitle = "Secondary Hotkey Key",
+                HotkeySecondaryKeySub = "Choose the hotkey for saving a longer replay.",
+                HotkeySecondaryDurationTitle = "Secondary Replay Duration",
+                HotkeySecondaryDurationSub = "Buffer duration in seconds for the secondary hotkey.",
+
+                StorageTitle = "Storage Manager",
+                StorageSub = "Automatically manage disk space for saved replays.",
+                StorageLimitToggle = "Limit Replays Folder Size",
+                StorageAgeTitle = "Auto-delete Old Clips",
+                StorageAgeSub = "Delete replays older than a specified number of days.",
+
+                ClipsTrimBtn = "✂️ Trim",
+                TrimDialogTitle = "Quick Clip Trimmer",
+                TrimStartLabel = "Start (seconds):",
+                TrimEndLabel = "End (seconds):",
+                TrimSaveBtn = "⚡ Save Trimmed Clip",
+                TrimCancelBtn = "Cancel",
+                TrimInvalidStart = "Invalid start time (must be >= 0).",
+                TrimInvalidEnd = "End time must be greater than start time.",
+                TrimError = "Error while trimming clip file.",
+                TrimSuccess = "Clip trimmed successfully!",
 
                 SystemLangTitle = "Application Language",
                 SystemLangSub = "Select the user interface language for Rewind.",
@@ -373,7 +474,7 @@ namespace ClipFlow {
                 AboutFootprintTitle = "System Resource Overhead",
                 AboutFootprintSub = "Ultra-low CPU overhead (<0.5%) and fixed ~80 MB RAM ceiling.",
 
-                TrayHeader = "Rewind v0.1",
+                TrayHeader = "Rewind v0.2",
                 TrayBufferActive = "    ● Buffer active (NVENC)",
                 TrayBufferPaused = "    ○ Buffer paused",
                 TraySaveClip = "⚡  Save Replay",
@@ -399,8 +500,8 @@ namespace ClipFlow {
                 SectionHeaderAudioSub = "Configure game audio loopback, microphone input, and replay sound effects.",
                 SectionHeaderHotkeys = "Hotkeys & Shortcuts",
                 SectionHeaderHotkeysSub = "Global key combinations to trigger instant replay clips.",
-                SectionHeaderSystem = "System, Appearance & Startup",
-                SectionHeaderSystemSub = "Customize theme appearance, gaming HUD toast, and Windows autostart.",
+                SectionHeaderSystem = "App Settings",
+                SectionHeaderSystemSub = "Advanced mode, theme appearance, gaming HUD toast, and Windows autostart.",
 
                 VideoGpuTitle = "Hardware-accelerated encoding",
                 VideoGpuSub = "GPU encoder offloads the CPU to < 0.5%, ensuring zero in-game FPS drops.",
@@ -433,7 +534,7 @@ namespace ClipFlow {
                 NavVideo = "📹  Video & Puffer",
                 NavAudio = "🎧  Audio & Mixer",
                 NavHotkeys = "⌨️  Tastenkombinationen",
-                NavSystem = "⚙️  System & Autostart",
+                NavSystem = "⚙️  Einstellungen",
                 NavAbout = "ℹ️  Über Rewind",
 
                 HeroHotkeyPrefix = "TASTE: ",
@@ -472,6 +573,14 @@ namespace ClipFlow {
                 VideoFolderSub = "Verzeichnis für MP4-Videodateien.",
                 VideoFolderBtn = "Ordner ändern...",
 
+                AdvancedModeTitle = "Erweiterte Einstellungen freischalten",
+                AdvancedModeSub = "Ersetzt feste Tasten und Schieberegler durch Textfelder für beliebige FPS-, Puffer-, Bitrate- und Lautstärkewerte.",
+                CustomDurationHint = "Dauer in Sekunden eingeben (z. B. 10, 45, 90, 180s)",
+                CustomFpsHint = "Beliebige FPS eingeben (z. B. 75, 144, 165, 240, 360)",
+                CustomBitrateHint = "Bitrate in Mbps eingeben (z. B. 12, 20, 35, 50 Mbps)",
+                CustomHotkeyHint = "Hotkey eingeben (z. B. F7, F11, Alt+F10, Ctrl+Shift+S)",
+                CustomVolumeHint = "Lautstärke in % eingeben (z. B. 50, 100, 150, 200, 300%)",
+
                 AudioPlaySoundTitle = "Bestätigungston beim Speichern",
                 AudioPlaySoundSub = "Kurzer Ton zur Bestätigung der Clip-Aufnahme.",
                 AudioPresetTitle = "Soundeffekt-Profil",
@@ -489,6 +598,29 @@ namespace ClipFlow {
 
                 HotkeyTitle = "Tastenkombination zum Speichern",
                 HotkeySub = "Globaler Hotkey funktioniert in allen Vollbildspielen.",
+                HotkeySecondaryTitle = "Zweiter Hotkey (Langer Clip)",
+                HotkeySecondarySub = "Zusätzlicher Hotkey für längere Wiederholungen (z. B. eine ganze Runde).",
+                HotkeySecondaryKeyTitle = "Taste für zweiten Hotkey",
+                HotkeySecondaryKeySub = "Wähle die Tastenkombination für die lange Wiederholung.",
+                HotkeySecondaryDurationTitle = "Dauer der zweiten Wiederholung",
+                HotkeySecondaryDurationSub = "Pufferzeit in Sekunden für den zweiten Hotkey.",
+
+                StorageTitle = "Speicherplatzverwaltung",
+                StorageSub = "Automatisches Verwalten des Speicherplatzes für Clips.",
+                StorageLimitToggle = "Ordnergröße für Clips begrenzen",
+                StorageAgeTitle = "Alte Clips automatisch löschen",
+                StorageAgeSub = "Clips löschen, die älter als eine bestimmte Anzahl Tage sind.",
+
+                ClipsTrimBtn = "✂️ Zuschneiden",
+                TrimDialogTitle = "Clip schnell zuschneiden",
+                TrimStartLabel = "Start (Sekunden):",
+                TrimEndLabel = "Ende (Sekunden):",
+                TrimSaveBtn = "⚡ Zugeschnittenen Clip speichern",
+                TrimCancelBtn = "Abbrechen",
+                TrimInvalidStart = "Ungültige Startzeit (muss >= 0 sein).",
+                TrimInvalidEnd = "Die Endzeit muss größer als die Startzeit sein.",
+                TrimError = "Fehler beim Zuschneiden der Datei.",
+                TrimSuccess = "Clip erfolgreich zugeschnitten!",
 
                 SystemLangTitle = "Sprache der Anwendung",
                 SystemLangSub = "Wählen Sie die Benutzeroberflächensprache für Rewind.",
@@ -510,7 +642,7 @@ namespace ClipFlow {
                 AboutFootprintTitle = "Ressourcenverbrauch",
                 AboutFootprintSub = "Minimale CPU-Auslastung (<0.5%) und feste ~80 MB RAM-Nutzung.",
 
-                TrayHeader = "Rewind v0.1",
+                TrayHeader = "Rewind v0.2",
                 TrayBufferActive = "    ● Puffer aktiv (NVENC)",
                 TrayBufferPaused = "    ○ Puffer pausiert",
                 TraySaveClip = "⚡  Replay speichern",
@@ -570,7 +702,7 @@ namespace ClipFlow {
                 NavVideo = "📹  Vídeo y Búfer",
                 NavAudio = "🎧  Audio y Mezclador",
                 NavHotkeys = "⌨️  Atajos de Teclado",
-                NavSystem = "⚙️  Sistema e Inicio",
+                NavSystem = "⚙️  Ajustes",
                 NavAbout = "ℹ️  Acerca de Rewind",
 
                 HeroHotkeyPrefix = "ATAJO: ",
@@ -609,6 +741,14 @@ namespace ClipFlow {
                 VideoFolderSub = "Directorio donde se guardan los archivos MP4.",
                 VideoFolderBtn = "Cambiar carpeta...",
 
+                AdvancedModeTitle = "Desbloquear ajustes avanzados",
+                AdvancedModeSub = "Sustituye los botones y controles por campos de texto para escribir cualquier valor de FPS, búfer, bitrate y volumen.",
+                CustomDurationHint = "Introduce la duración en segundos (ej. 10, 45, 90, 180s)",
+                CustomFpsHint = "Introduce FPS personalizados (ej. 75, 144, 165, 240, 360)",
+                CustomBitrateHint = "Introduce bitrate en Mbps (ej. 12, 20, 35, 50 Mbps)",
+                CustomHotkeyHint = "Introduce atajo (ej. F7, F11, Alt+F10, Ctrl+Shift+S)",
+                CustomVolumeHint = "Introduce el volumen en % (ej. 50, 100, 150, 200, 300%)",
+
                 AudioPlaySoundTitle = "Sonido de confirmación",
                 AudioPlaySoundSub = "Señal de audio que confirma la captura del clip.",
                 AudioPresetTitle = "Perfil de efecto de sonido",
@@ -626,6 +766,29 @@ namespace ClipFlow {
 
                 HotkeyTitle = "Atajo para guardar repetición",
                 HotkeySub = "Atajo global activo en todos los juegos a pantalla completa.",
+                HotkeySecondaryTitle = "Atajo secundario (Clip largo)",
+                HotkeySecondarySub = "Atajo adicional para capturar una repetición más larga (ej. una ronda entera).",
+                HotkeySecondaryKeyTitle = "Tecla de atajo secundario",
+                HotkeySecondaryKeySub = "Selecciona la tecla de acceso rápido para repeticiones largas.",
+                HotkeySecondaryDurationTitle = "Duración de repetición secundaria",
+                HotkeySecondaryDurationSub = "Tiempo de búfer en segundos para el atajo secundario.",
+
+                StorageTitle = "Gestión de almacenamiento",
+                StorageSub = "Control automático del espacio en disco para repeticiones.",
+                StorageLimitToggle = "Limitar tamaño de la carpeta de clips",
+                StorageAgeTitle = "Eliminar clips antiguos",
+                StorageAgeSub = "Eliminar repeticiones anteriores al número de días indicado.",
+
+                ClipsTrimBtn = "✂️ Recortar",
+                TrimDialogTitle = "Recorte rápido de clip",
+                TrimStartLabel = "Inicio (segundos):",
+                TrimEndLabel = "Fin (segundos):",
+                TrimSaveBtn = "⚡ Guardar clip recortado",
+                TrimCancelBtn = "Cancelar",
+                TrimInvalidStart = "Hora de inicio no válida (debe ser >= 0).",
+                TrimInvalidEnd = "La hora de finalización debe ser posterior a la de inicio.",
+                TrimError = "Error al recortar el archivo.",
+                TrimSuccess = "¡Clip recortado correctamente!",
 
                 SystemLangTitle = "Idioma de la aplicación",
                 SystemLangSub = "Selecciona el idioma de la interfaz de Rewind.",
@@ -647,7 +810,7 @@ namespace ClipFlow {
                 AboutFootprintTitle = "Consumo de recursos",
                 AboutFootprintSub = "Uso mínimo de CPU (<0.5%) y memoria RAM fija en ~80 MB.",
 
-                TrayHeader = "Rewind v0.1",
+                TrayHeader = "Rewind v0.2",
                 TrayBufferActive = "    ● Búfer activo (NVENC)",
                 TrayBufferPaused = "    ○ Búfer en pausa",
                 TraySaveClip = "⚡  Guardar repetición",
@@ -707,7 +870,7 @@ namespace ClipFlow {
                 NavVideo = "📹  Vidéo & Mémoire",
                 NavAudio = "🎧  Audio & Mixeur",
                 NavHotkeys = "⌨️  Raccourcis",
-                NavSystem = "⚙️  Système & Démarrage",
+                NavSystem = "⚙️  Paramètres",
                 NavAbout = "ℹ️  À propos de Rewind",
 
                 HeroHotkeyPrefix = "RACCOURCI : ",
@@ -746,6 +909,14 @@ namespace ClipFlow {
                 VideoFolderSub = "Répertoire où sont sauvegardés les fichiers MP4.",
                 VideoFolderBtn = "Changer de dossier...",
 
+                AdvancedModeTitle = "Déverrouiller les paramètres avancés",
+                AdvancedModeSub = "Remplace les sélecteurs fixes par des champs de texte pour saisir n'importe quel FPS, durée, débit et volume.",
+                CustomDurationHint = "Entrez la durée en secondes (ex. 10, 45, 90, 180s)",
+                CustomFpsHint = "Entrez des FPS personnalisés (ex. 75, 144, 165, 240, 360)",
+                CustomBitrateHint = "Entrez le débit en Mbps (ex. 12, 20, 35, 50 Mbps)",
+                CustomHotkeyHint = "Entrez le raccourci (ex. F7, F11, Alt+F10, Ctrl+Shift+S)",
+                CustomVolumeHint = "Entrez le volume en % (ex. 50, 100, 150, 200, 300%)",
+
                 AudioPlaySoundTitle = "Son de confirmation",
                 AudioPlaySoundSub = "Bip audio confirmant la capture du clip.",
                 AudioPresetTitle = "Profil d'effet sonore",
@@ -763,6 +934,29 @@ namespace ClipFlow {
 
                 HotkeyTitle = "Raccourci de capture",
                 HotkeySub = "Raccourci global fonctionnant dans tous les jeux plein écran.",
+                HotkeySecondaryTitle = "Raccourci secondaire (Clip long)",
+                HotkeySecondarySub = "Raccourci supplémentaire pour enregistrer un replay plus long.",
+                HotkeySecondaryKeyTitle = "Touche de raccourci secondaire",
+                HotkeySecondaryKeySub = "Choisissez la touche pour les longs replays.",
+                HotkeySecondaryDurationTitle = "Durée du replay secondaire",
+                HotkeySecondaryDurationSub = "Durée du tampon en secondes pour le raccourci secondaire.",
+
+                StorageTitle = "Gestion de l'espace disque",
+                StorageSub = "Surveillance automatique de l'espace disque des clips.",
+                StorageLimitToggle = "Limiter la taille du dossier de clips",
+                StorageAgeTitle = "Suppression automatique des anciens clips",
+                StorageAgeSub = "Supprimer les clips plus anciens qu'un nombre de jours défini.",
+
+                ClipsTrimBtn = "✂️ Découper",
+                TrimDialogTitle = "Découpage rapide de clip",
+                TrimStartLabel = "Début (secondes) :",
+                TrimEndLabel = "Fin (secondes) :",
+                TrimSaveBtn = "⚡ Sauvegarder le clip découpé",
+                TrimCancelBtn = "Annuler",
+                TrimInvalidStart = "Heure de début non valide (doit être >= 0).",
+                TrimInvalidEnd = "L'heure de fin doit être supérieure à l'heure de début.",
+                TrimError = "Erreur lors du découpage du clip.",
+                TrimSuccess = "Clip découpé avec succès !",
 
                 SystemLangTitle = "Langue de l'application",
                 SystemLangSub = "Choisissez la langue de l'interface de Rewind.",
@@ -784,7 +978,7 @@ namespace ClipFlow {
                 AboutFootprintTitle = "Consommation système",
                 AboutFootprintSub = "Charge CPU minimale (<0.5%) et RAM plafonnée à ~80 Mo.",
 
-                TrayHeader = "Rewind v0.1",
+                TrayHeader = "Rewind v0.2",
                 TrayBufferActive = "    ● Mémoire active (NVENC)",
                 TrayBufferPaused = "    ○ Mémoire en pause",
                 TraySaveClip = "⚡  Sauvegarder le clip",
@@ -844,7 +1038,7 @@ namespace ClipFlow {
                 NavVideo = "📹  Відео та буфер",
                 NavAudio = "🎧  Аудіо та мікшер",
                 NavHotkeys = "⌨️  Гарячі клавіші",
-                NavSystem = "⚙️  Система та автозапуск",
+                NavSystem = "⚙️  Налаштування",
                 NavAbout = "ℹ️  Про програму",
 
                 HeroHotkeyPrefix = "СКОРОЧЕННЯ: ",
@@ -883,6 +1077,14 @@ namespace ClipFlow {
                 VideoFolderSub = "Каталог, куди зберігаються готові MP4 файли.",
                 VideoFolderBtn = "Змінити папку...",
 
+                AdvancedModeTitle = "Розблокувати розширені налаштування",
+                AdvancedModeSub = "Замінює кнопки та повзунки на текстові поля, де можна ввести довільні значення FPS, буфера, бітрейту та гучності.",
+                CustomDurationHint = "Введіть тривалість у секундах (напр. 10, 45, 90, 180с)",
+                CustomFpsHint = "Введіть довільний FPS (напр. 75, 144, 165, 240, 360)",
+                CustomBitrateHint = "Введіть бітрейт у Mbps (напр. 12, 20, 35, 50 Mbps)",
+                CustomHotkeyHint = "Введіть гарячу клавішу (напр. F7, F11, Alt+F10, Ctrl+Shift+S)",
+                CustomVolumeHint = "Введіть гучність у % (напр. 50, 100, 150, 200, 300%)",
+
                 AudioPlaySoundTitle = "Звук підтвердження запису",
                 AudioPlaySoundSub = "Короткий звуковий сигнал підтвердження збереження.",
                 AudioPresetTitle = "Вибір звукового профілю",
@@ -900,6 +1102,29 @@ namespace ClipFlow {
 
                 HotkeyTitle = "Гаряча клавіша збереження",
                 HotkeySub = "Глобальна комбінація клавіш для всіх повноекранних ігор.",
+                HotkeySecondaryTitle = "Друга комбінація (Довгий кліп)",
+                HotkeySecondarySub = "Додаткова комбінація для запису довшого повтору (наприклад, усього раунду).",
+                HotkeySecondaryKeyTitle = "Клавіша другого скорочення",
+                HotkeySecondaryKeySub = "Оберіть комбінацію клавіш для тривалого повтору.",
+                HotkeySecondaryDurationTitle = "Тривалість другого повтору",
+                HotkeySecondaryDurationSub = "Час буфера в секундах для другого скорочення.",
+
+                StorageTitle = "Керування пам'яттю диска",
+                StorageSub = "Автоматичний контроль вільного простору на диску з кліпами.",
+                StorageLimitToggle = "Обмежити розмір папки кліпів",
+                StorageAgeTitle = "Автоматичне видалення старих кліпів",
+                StorageAgeSub = "Видаляти кліпи старіші за вказану кількість днів.",
+
+                ClipsTrimBtn = "✂️ Обрізати",
+                TrimDialogTitle = "Швидке обрізання кліпу",
+                TrimStartLabel = "Початок (секунди):",
+                TrimEndLabel = "Кінець (секунди):",
+                TrimSaveBtn = "⚡ Зберегти обрізаний кліп",
+                TrimCancelBtn = "Скасувати",
+                TrimInvalidStart = "Неприпустимий час початку (має бути >= 0).",
+                TrimInvalidEnd = "Час завершення має бути більшим за час початку.",
+                TrimError = "Помилка під час обрізання кліпу.",
+                TrimSuccess = "Кліп успішно обрізано!",
 
                 SystemLangTitle = "Мова програми",
                 SystemLangSub = "Оберіть мову інтерфейсу Rewind.",
@@ -921,7 +1146,7 @@ namespace ClipFlow {
                 AboutFootprintTitle = "Навантаження на систему",
                 AboutFootprintSub = "Мінімальне використання процесора (<0.5%) та ~80 МБ RAM.",
 
-                TrayHeader = "Rewind v0.1",
+                TrayHeader = "Rewind v0.2",
                 TrayBufferActive = "    ● Буфер активний (NVENC)",
                 TrayBufferPaused = "    ○ Буфер призупинено",
                 TraySaveClip = "⚡  Зберегти повтор",

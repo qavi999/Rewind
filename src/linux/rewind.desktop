@@ -1,0 +1,20 @@
+[Desktop Entry]
+Name=Rewind
+GenericName=Replay Recorder
+Comment=Instant replay rolling buffer clip recorder
+Exec=rewind
+Icon=rewind
+Terminal=false
+Type=Application
+Categories=AudioVideo;Recorder;Utility;
+Keywords=replay;clip;recording;gameplay;shadowplay;
+StartupNotify=true
+Actions=SaveClip;ToggleBuffer;
+
+[Desktop Action SaveClip]
+Name=Zapisz powtórkę
+Exec=rewind --save
+
+[Desktop Action ToggleBuffer]
+Name=Wstrzymaj / Wznów bufor
+Exec=rewind --toggle

@@ -157,7 +157,7 @@ namespace RewindInstaller {
                 LangName = "Polski",
                 Flag = "🇵🇱",
                 LangLabel = "Język aplikacji:",
-                TitleSetup = "Instalator Rewind v0.1",
+                TitleSetup = "Instalator Rewind v0.2",
                 TitleUninstall = "Dezinstalacja Rewind",
                 HeaderInstallTitle = "Instalacja programu Rewind",
                 HeaderInstallSub = "Błyskawiczne zapisywanie powtórek z gier i pulpitu (NVIDIA NVENC).",
@@ -202,7 +202,7 @@ namespace RewindInstaller {
                 LangName = "English",
                 Flag = "🇬🇧",
                 LangLabel = "Application language:",
-                TitleSetup = "Rewind Setup v0.1",
+                TitleSetup = "Rewind Setup v0.2",
                 TitleUninstall = "Uninstall Rewind",
                 HeaderInstallTitle = "Install Rewind",
                 HeaderInstallSub = "Instant replay buffer and game clipping engine (NVIDIA NVENC).",
@@ -247,7 +247,7 @@ namespace RewindInstaller {
                 LangName = "Deutsch",
                 Flag = "🇩🇪",
                 LangLabel = "Anwendungssprache:",
-                TitleSetup = "Rewind Setup v0.1",
+                TitleSetup = "Rewind Setup v0.2",
                 TitleUninstall = "Rewind deinstallieren",
                 HeaderInstallTitle = "Rewind Installation",
                 HeaderInstallSub = "Blitzschnelle Gaming-Wiederholungen und Clips (NVIDIA NVENC).",
@@ -292,7 +292,7 @@ namespace RewindInstaller {
                 LangName = "Español",
                 Flag = "🇪🇸",
                 LangLabel = "Idioma de la aplicación:",
-                TitleSetup = "Instalador de Rewind v0.1",
+                TitleSetup = "Instalador de Rewind v0.2",
                 TitleUninstall = "Desinstalar Rewind",
                 HeaderInstallTitle = "Instalar Rewind",
                 HeaderInstallSub = "Captura instantánea de repeticiones en juegos y escritorio (NVIDIA NVENC).",
@@ -337,7 +337,7 @@ namespace RewindInstaller {
                 LangName = "Français",
                 Flag = "🇫🇷",
                 LangLabel = "Langue de l'application :",
-                TitleSetup = "Installation de Rewind v0.1",
+                TitleSetup = "Installation de Rewind v0.2",
                 TitleUninstall = "Désinstaller Rewind",
                 HeaderInstallTitle = "Installer Rewind",
                 HeaderInstallSub = "Capture instantanée de clips et replay gaming (NVIDIA NVENC).",
@@ -382,7 +382,7 @@ namespace RewindInstaller {
                 LangName = "Українська",
                 Flag = "🇺🇦",
                 LangLabel = "Мова програми:",
-                TitleSetup = "Встановлення Rewind v0.1",
+                TitleSetup = "Встановлення Rewind v0.2",
                 TitleUninstall = "Видалення Rewind",
                 HeaderInstallTitle = "Встановлення Rewind",
                 HeaderInstallSub = "Миттєвий запис ігрових повторів та кліпів (NVIDIA NVENC).",
@@ -696,7 +696,7 @@ namespace RewindInstaller {
             footerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
             var hintTb = new TextBlock {
-                Text = "Rewind v0.1 Standalone",
+                Text = "Rewind v0.2 Standalone",
                 FontSize = 11,
                 Foreground = new SolidColorBrush(Color.FromRgb(100, 100, 100)),
                 VerticalAlignment = VerticalAlignment.Center
@@ -1387,7 +1387,7 @@ namespace RewindInstaller {
                 using (var key = Registry.CurrentUser.CreateSubKey(keyPath)) {
                     if (key != null) {
                         key.SetValue("DisplayName", "Rewind");
-                        key.SetValue("DisplayVersion", "0.1");
+                        key.SetValue("DisplayVersion", "0.2");
                         key.SetValue("Publisher", "Rewind");
                         key.SetValue("DisplayIcon", mainExePath + ",0");
                         key.SetValue("InstallLocation", Path.GetDirectoryName(mainExePath));

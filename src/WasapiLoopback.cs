@@ -132,8 +132,10 @@ namespace ClipFlow {
         public volatile float MicVolume = 1.0f;
         public volatile string MicDeviceId = "default";
         public volatile bool MicEnabled = true;
+        public volatile bool SeparateTracks = false;
 
         public int SampleRate { get; private set; }
+        public int OutputChannels { get { return SeparateTracks ? 4 : 2; } }
 
         public string PipePath {
             get { return _fullPipePath; }
@@ -146,13 +148,14 @@ namespace ClipFlow {
         private short[] _micTempShorts = new short[8192];
         private byte[] _micTempBytes = new byte[16384];
 
-        public WasapiLoopbackServer(float sysVol, float micVol, string micId) {
+        public WasapiLoopbackServer(float sysVol, float micVol, string micId, bool separateTracks = false) {
             _pipeName = "clipflow_audio_" + Guid.NewGuid().ToString("N");
             _fullPipePath = @"\\.\pipe\" + _pipeName;
             SystemVolume = sysVol;
             MicVolume = micVol;
             MicDeviceId = string.IsNullOrEmpty(micId) ? "default" : micId;
             MicEnabled = (MicDeviceId != "none");
+            SeparateTracks = separateTracks;
             SampleRate = 48000;
         }
 
@@ -279,91 +282,32 @@ namespace ClipFlow {
                 Guid iidCapture = new Guid("C8ADBD64-E71E-48a0-A4DE-185C395CD317");
                 Guid emptyGuid = Guid.Empty;
 
-                // 1. Initialize Render and Silent Client (To keep WASAPI loopback running continuously!)
-                IMMDevice dev;
-                if (enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia, out dev) == 0 && dev != null) {
-                    IntPtr pRenderClientObj;
-                    if (dev.Activate(iidClient, 1, IntPtr.Zero, out pRenderClientObj) == 0 && pRenderClientObj != IntPtr.Zero) {
-                        renderClient = (IAudioClient)Marshal.GetObjectForIUnknown(pRenderClientObj);
-                        renderClient.GetMixFormat(out pSysFormat);
+                TryInitRenderAndLoop(enumerator, iidClient, iidRender, iidCapture, emptyGuid,
+                    ref renderClient, ref audioRender, ref renderBufferSize, ref loopClient, ref loopCapture,
+                    ref pSysFormat, ref sysChannels, ref sysBitsPerSample, ref sysIsFloat);
 
-                        var wf = (WAVEFORMATEX)Marshal.PtrToStructure(pSysFormat, typeof(WAVEFORMATEX));
-                        SampleRate = (int)wf.nSamplesPerSec;
-                        sysChannels = wf.nChannels;
-                        sysBitsPerSample = wf.wBitsPerSample;
-                        sysIsFloat = (wf.wFormatTag == 3 /* IEEE_FLOAT */ || wf.wFormatTag == 0xFFFE);
-
-                        if (renderClient.Initialize(0, 0, 10000000, 0, pSysFormat, emptyGuid) == 0) {
-                            IntPtr pRender;
-                            if (renderClient.GetService(iidRender, out pRender) == 0 && pRender != IntPtr.Zero) {
-                                audioRender = (IAudioRenderClient)Marshal.GetObjectForIUnknown(pRender);
-                                renderClient.GetBufferSize(out renderBufferSize);
-                                IntPtr pRData;
-                                if (audioRender.GetBuffer(renderBufferSize, out pRData) == 0) {
-                                    audioRender.ReleaseBuffer(renderBufferSize, AUDCLNT_BUFFERFLAGS_SILENT);
-                                }
-                                renderClient.Start();
-                            }
-                        }
-                    }
-
-                    // 2. Initialize Loopback Capture on the same render device
-                    IntPtr pLoopClientObj;
-                    if (dev.Activate(iidClient, 1, IntPtr.Zero, out pLoopClientObj) == 0 && pLoopClientObj != IntPtr.Zero) {
-                        loopClient = (IAudioClient)Marshal.GetObjectForIUnknown(pLoopClientObj);
-                        if (loopClient.Initialize(0, AUDCLNT_STREAMFLAGS_LOOPBACK, 10000000, 0, pSysFormat, emptyGuid) == 0) {
-                            IntPtr pCap;
-                            if (loopClient.GetService(iidCapture, out pCap) == 0 && pCap != IntPtr.Zero) {
-                                loopCapture = (IAudioCaptureClient)Marshal.GetObjectForIUnknown(pCap);
-                                loopClient.Start();
-                            }
-                        }
-                    }
-                }
-
-                // 3. Initialize Microphone Audio (if enabled)
                 if (MicEnabled && MicDeviceId != "none") {
-                    try {
-                        IMMDevice micDev = null;
-                        if (MicDeviceId == "default") {
-                            enumerator.GetDefaultAudioEndpoint(EDataFlow.eCapture, ERole.eMultimedia, out micDev);
-                        } else {
-                            enumerator.GetDevice(MicDeviceId, out micDev);
-                        }
-
-                        if (micDev != null) {
-                            IntPtr pMicClientObj;
-                            if (micDev.Activate(iidClient, 1, IntPtr.Zero, out pMicClientObj) == 0 && pMicClientObj != IntPtr.Zero) {
-                                micClient = (IAudioClient)Marshal.GetObjectForIUnknown(pMicClientObj);
-                                micClient.GetMixFormat(out pMicFormat);
-
-                                var mwf = (WAVEFORMATEX)Marshal.PtrToStructure(pMicFormat, typeof(WAVEFORMATEX));
-                                micChannels = mwf.nChannels;
-                                micBitsPerSample = mwf.wBitsPerSample;
-                                micIsFloat = (mwf.wFormatTag == 3 || mwf.wFormatTag == 0xFFFE);
-
-                                if (micClient.Initialize(0, 0, 10000000, 0, pMicFormat, emptyGuid) == 0) {
-                                    IntPtr pCap;
-                                    if (micClient.GetService(iidCapture, out pCap) == 0 && pCap != IntPtr.Zero) {
-                                        micCapture = (IAudioCaptureClient)Marshal.GetObjectForIUnknown(pCap);
-                                        micClient.Start();
-                                    }
-                                }
-                            }
-                        }
-                    } catch { }
+                    TryInitMic(enumerator, MicDeviceId, iidClient, iidCapture, emptyGuid,
+                        ref micClient, ref micCapture, ref pMicFormat, ref micChannels, ref micBitsPerSample, ref micIsFloat);
                 }
 
                 // Mixing & Streaming Buffers
                 var micFifo = new Queue<float>(19200);
-                float[] mixFloats = new float[3840]; // 40ms stereo buffer
+                float[] mixFloats = new float[7680]; // Buffer for stereo or quad (4-channel) audio
+                float[] sysStereo = new float[3840];
                 byte[] byteBuffer = new byte[mixFloats.Length * 4];
+
+                long lastWriteTick = Stopwatch.GetTimestamp();
+                double ticksPerMs = (double)Stopwatch.Frequency / 1000.0;
+                int consecutiveErrors = 0;
+                bool needsReset = false;
 
                 while (_isRunning && _pipeServer.IsConnected) {
                     // A. Keep Silent Render Stream Alive (Crucial: prevents WASAPI loopback starvation!)
                     if (renderClient != null && audioRender != null) {
                         uint padding;
-                        if (renderClient.GetCurrentPadding(out padding) == 0) {
+                        int hrPad = renderClient.GetCurrentPadding(out padding);
+                        if (hrPad == 0) {
                             uint toFill = renderBufferSize - padding;
                             if (toFill > 0) {
                                 IntPtr pRData;
@@ -371,6 +315,8 @@ namespace ClipFlow {
                                     audioRender.ReleaseBuffer(toFill, AUDCLNT_BUFFERFLAGS_SILENT);
                                 }
                             }
+                        } else if (hrPad == unchecked((int)0x88890004) || hrPad == unchecked((int)0x88890026)) {
+                            needsReset = true;
                         }
                     }
 
@@ -400,79 +346,221 @@ namespace ClipFlow {
 
                     // C. Drain all available packets from Loopback Capture & Mix
                     bool hadPackets = false;
-                    if (loopCapture != null) {
+                    if (loopCapture != null && !needsReset) {
                         uint loopPkt;
-                        while (loopCapture.GetNextPacketSize(out loopPkt) == 0 && loopPkt > 0) {
-                            hadPackets = true;
-                            IntPtr pData; uint frames; int flags; ulong pos, qpc;
-                            if (loopCapture.GetBuffer(out pData, out frames, out flags, out pos, out qpc) == 0) {
-                                if (frames > 0) {
-                                    int samples = (int)frames * 2; // Stereo output
-                                    if (mixFloats.Length < samples) {
-                                        mixFloats = new float[samples * 2];
-                                        byteBuffer = new byte[mixFloats.Length * 4];
-                                    }
+                        int hrPkt = loopCapture.GetNextPacketSize(out loopPkt);
+                        if (hrPkt == 0) {
+                            consecutiveErrors = 0;
+                            while (loopPkt > 0) {
+                                hadPackets = true;
+                                IntPtr pData; uint frames; int flags; ulong pos, qpc;
+                                if (loopCapture.GetBuffer(out pData, out frames, out flags, out pos, out qpc) == 0) {
+                                    if (frames > 0) {
+                                        float curSysVol = SystemVolume;
+                                        bool isSysSilent = ((flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0) || (curSysVol < 0.001f);
 
-                                    float curSysVol = SystemVolume;
-                                    bool isSysSilent = ((flags & AUDCLNT_BUFFERFLAGS_SILENT) != 0) || (curSysVol < 0.001f);
+                                        if (SeparateTracks) {
+                                            int quadSamples = (int)frames * 4;
+                                            int stereoSamples = (int)frames * 2;
+                                            if (mixFloats.Length < quadSamples) {
+                                                mixFloats = new float[quadSamples * 2];
+                                                byteBuffer = new byte[mixFloats.Length * 4];
+                                            }
+                                            if (sysStereo.Length < stereoSamples) {
+                                                sysStereo = new float[stereoSamples * 2];
+                                            }
 
-                                    if (isSysSilent) {
-                                        Array.Clear(mixFloats, 0, samples);
-                                    } else {
-                                        ExtractSystemSamples(pData, frames, sysChannels, sysBitsPerSample, sysIsFloat, curSysVol, mixFloats);
-                                    }
+                                            if (isSysSilent) {
+                                                Array.Clear(sysStereo, 0, stereoSamples);
+                                            } else {
+                                                ExtractSystemSamples(pData, frames, sysChannels, sysBitsPerSample, sysIsFloat, curSysVol, sysStereo);
+                                            }
 
-                                    // Mix in microphone
-                                    for (int i = 0; i < samples; i += 2) {
-                                        float micL = 0f;
-                                        float micR = 0f;
-                                        if (micFifo.Count >= 2) {
-                                            micL = micFifo.Dequeue();
-                                            micR = micFifo.Dequeue();
-                                        } else if (micFifo.Count == 1) {
-                                            micL = micFifo.Dequeue();
-                                            micR = micL;
+                                            for (int i = 0; i < (int)frames; i++) {
+                                                float micL = 0f;
+                                                float micR = 0f;
+                                                if (micFifo.Count >= 2) {
+                                                    micL = micFifo.Dequeue();
+                                                    micR = micFifo.Dequeue();
+                                                } else if (micFifo.Count == 1) {
+                                                    micL = micFifo.Dequeue();
+                                                    micR = micL;
+                                                }
+
+                                                mixFloats[i * 4 + 0] = sysStereo[i * 2 + 0];
+                                                mixFloats[i * 4 + 1] = sysStereo[i * 2 + 1];
+                                                mixFloats[i * 4 + 2] = micL;
+                                                mixFloats[i * 4 + 3] = micR;
+                                            }
+
+                                            int bytesToWrite = quadSamples * 4;
+                                            Buffer.BlockCopy(mixFloats, 0, byteBuffer, 0, bytesToWrite);
+                                            try {
+                                                _pipeServer.Write(byteBuffer, 0, bytesToWrite);
+                                                lastWriteTick = Stopwatch.GetTimestamp();
+                                            } catch {
+                                                break;
+                                            }
+                                        } else {
+                                            int samples = (int)frames * 2; // Stereo output
+                                            if (mixFloats.Length < samples) {
+                                                mixFloats = new float[samples * 2];
+                                                byteBuffer = new byte[mixFloats.Length * 4];
+                                            }
+
+                                            if (isSysSilent) {
+                                                Array.Clear(mixFloats, 0, samples);
+                                            } else {
+                                                ExtractSystemSamples(pData, frames, sysChannels, sysBitsPerSample, sysIsFloat, curSysVol, mixFloats);
+                                            }
+
+                                            // Mix in microphone
+                                            for (int i = 0; i < samples; i += 2) {
+                                                float micL = 0f;
+                                                float micR = 0f;
+                                                if (micFifo.Count >= 2) {
+                                                    micL = micFifo.Dequeue();
+                                                    micR = micFifo.Dequeue();
+                                                } else if (micFifo.Count == 1) {
+                                                    micL = micFifo.Dequeue();
+                                                    micR = micL;
+                                                }
+
+                                                float outL = mixFloats[i] + micL;
+                                                float outR = mixFloats[i + 1] + micR;
+
+                                                // Soft limiter (prevent harsh digital distortion)
+                                                if (outL > 1.0f) outL = 1.0f; else if (outL < -1.0f) outL = -1.0f;
+                                                if (outR > 1.0f) outR = 1.0f; else if (outR < -1.0f) outR = -1.0f;
+
+                                                mixFloats[i] = outL;
+                                                mixFloats[i + 1] = outR;
+                                            }
+
+                                            int bytesToWrite = samples * 4;
+                                            Buffer.BlockCopy(mixFloats, 0, byteBuffer, 0, bytesToWrite);
+                                            try {
+                                                _pipeServer.Write(byteBuffer, 0, bytesToWrite);
+                                                lastWriteTick = Stopwatch.GetTimestamp();
+                                            } catch {
+                                                break;
+                                            }
                                         }
 
-                                        float outL = mixFloats[i] + micL;
-                                        float outR = mixFloats[i + 1] + micR;
-
-                                        // Soft limiter (prevent harsh digital distortion)
-                                        if (outL > 1.0f) outL = 1.0f; else if (outL < -1.0f) outL = -1.0f;
-                                        if (outR > 1.0f) outR = 1.0f; else if (outR < -1.0f) outR = -1.0f;
-
-                                        mixFloats[i] = outL;
-                                        mixFloats[i + 1] = outR;
+                                        loopCapture.ReleaseBuffer(frames);
                                     }
-
-                                    int bytesToWrite = samples * 4;
-                                    Buffer.BlockCopy(mixFloats, 0, byteBuffer, 0, bytesToWrite);
-                                    _pipeServer.Write(byteBuffer, 0, bytesToWrite);
-
-                                    loopCapture.ReleaseBuffer(frames);
                                 }
+
+                                if (loopCapture.GetNextPacketSize(out loopPkt) != 0) break;
+                            }
+                        } else {
+                            consecutiveErrors++;
+                            if (consecutiveErrors > 15 || hrPkt == unchecked((int)0x88890004) || hrPkt == unchecked((int)0x88890026)) {
+                                needsReset = true;
                             }
                         }
                     }
 
+                    // D. Fallback Continuous Clocking:
+                    // If no audio packet was written in the last 20ms (e.g. system is quiet, asleep, or device changed),
+                    // synthesize a 20ms block of silence (mixed with mic if available) so FFmpeg's muxer never starves!
+                    double elapsedSinceWrite = (Stopwatch.GetTimestamp() - lastWriteTick) / ticksPerMs;
+                    if (elapsedSinceWrite >= 20.0) {
+                        int synthFrames = (int)(SampleRate * 0.020);
+                        if (SeparateTracks) {
+                            int quadSamples = synthFrames * 4;
+                            if (mixFloats.Length < quadSamples) {
+                                mixFloats = new float[quadSamples * 2];
+                                byteBuffer = new byte[mixFloats.Length * 4];
+                            }
+                            Array.Clear(mixFloats, 0, quadSamples);
+
+                            for (int i = 0; i < synthFrames; i++) {
+                                float micL = 0f;
+                                float micR = 0f;
+                                if (micFifo.Count >= 2) {
+                                    micL = micFifo.Dequeue();
+                                    micR = micFifo.Dequeue();
+                                } else if (micFifo.Count == 1) {
+                                    micL = micFifo.Dequeue();
+                                    micR = micL;
+                                }
+                                mixFloats[i * 4 + 0] = 0f;
+                                mixFloats[i * 4 + 1] = 0f;
+                                mixFloats[i * 4 + 2] = micL;
+                                mixFloats[i * 4 + 3] = micR;
+                            }
+
+                            int bytesToWrite = quadSamples * 4;
+                            Buffer.BlockCopy(mixFloats, 0, byteBuffer, 0, bytesToWrite);
+                            try {
+                                _pipeServer.Write(byteBuffer, 0, bytesToWrite);
+                                lastWriteTick = Stopwatch.GetTimestamp();
+                            } catch {
+                                break;
+                            }
+                        } else {
+                            int synthSamples = synthFrames * 2;
+                            if (mixFloats.Length < synthSamples) {
+                                mixFloats = new float[synthSamples * 2];
+                                byteBuffer = new byte[mixFloats.Length * 4];
+                            }
+                            Array.Clear(mixFloats, 0, synthSamples);
+
+                            for (int i = 0; i < synthSamples; i += 2) {
+                                float micL = 0f;
+                                float micR = 0f;
+                                if (micFifo.Count >= 2) {
+                                    micL = micFifo.Dequeue();
+                                    micR = micFifo.Dequeue();
+                                } else if (micFifo.Count == 1) {
+                                    micL = micFifo.Dequeue();
+                                    micR = micL;
+                                }
+                                mixFloats[i] = micL;
+                                mixFloats[i + 1] = micR;
+                            }
+
+                            int bytesToWrite = synthSamples * 4;
+                            Buffer.BlockCopy(mixFloats, 0, byteBuffer, 0, bytesToWrite);
+                            try {
+                                _pipeServer.Write(byteBuffer, 0, bytesToWrite);
+                                lastWriteTick = Stopwatch.GetTimestamp();
+                            } catch {
+                                break;
+                            }
+                        }
+                    }
+
+                    // E. Device Invalidation Auto-Recovery
+                    if (needsReset) {
+                        ReleaseRenderAndLoop(ref renderClient, ref audioRender, ref loopClient, ref loopCapture, ref pSysFormat);
+                        ReleaseMic(ref micClient, ref micCapture, ref pMicFormat);
+                        Thread.Sleep(200);
+
+                        TryInitRenderAndLoop(enumerator, iidClient, iidRender, iidCapture, emptyGuid,
+                            ref renderClient, ref audioRender, ref renderBufferSize, ref loopClient, ref loopCapture,
+                            ref pSysFormat, ref sysChannels, ref sysBitsPerSample, ref sysIsFloat);
+
+                        if (MicEnabled && MicDeviceId != "none") {
+                            TryInitMic(enumerator, MicDeviceId, iidClient, iidCapture, emptyGuid,
+                                ref micClient, ref micCapture, ref pMicFormat, ref micChannels, ref micBitsPerSample, ref micIsFloat);
+                        }
+
+                        needsReset = false;
+                        consecutiveErrors = 0;
+                    }
+
                     if (!hadPackets) {
-                        Thread.Sleep(3);
+                        Thread.Sleep(2);
                     }
                 }
             } catch {
             } finally {
                 timeEndPeriod(1);
 
-                try { if (renderClient != null) renderClient.Stop(); } catch { }
-                try { if (loopClient != null) loopClient.Stop(); } catch { }
-                try { if (micClient != null) micClient.Stop(); } catch { }
-
-                if (pSysFormat != IntPtr.Zero) {
-                    try { Marshal.FreeCoTaskMem(pSysFormat); } catch { }
-                }
-                if (pMicFormat != IntPtr.Zero) {
-                    try { Marshal.FreeCoTaskMem(pMicFormat); } catch { }
-                }
+                ReleaseRenderAndLoop(ref renderClient, ref audioRender, ref loopClient, ref loopCapture, ref pSysFormat);
+                ReleaseMic(ref micClient, ref micCapture, ref pMicFormat);
 
                 try {
                     if (_pipeServer != null) {
@@ -481,6 +569,151 @@ namespace ClipFlow {
                     }
                 } catch { }
             }
+        }
+
+        private static void ReleaseRenderAndLoop(
+            ref IAudioClient renderClient,
+            ref IAudioRenderClient audioRender,
+            ref IAudioClient loopClient,
+            ref IAudioCaptureClient loopCapture,
+            ref IntPtr pSysFormat)
+        {
+            try { if (renderClient != null) renderClient.Stop(); } catch { }
+            try { if (loopClient != null) loopClient.Stop(); } catch { }
+            renderClient = null;
+            audioRender = null;
+            loopClient = null;
+            loopCapture = null;
+            if (pSysFormat != IntPtr.Zero) {
+                try { Marshal.FreeCoTaskMem(pSysFormat); } catch { }
+                pSysFormat = IntPtr.Zero;
+            }
+        }
+
+        private static void ReleaseMic(
+            ref IAudioClient micClient,
+            ref IAudioCaptureClient micCapture,
+            ref IntPtr pMicFormat)
+        {
+            try { if (micClient != null) micClient.Stop(); } catch { }
+            micClient = null;
+            micCapture = null;
+            if (pMicFormat != IntPtr.Zero) {
+                try { Marshal.FreeCoTaskMem(pMicFormat); } catch { }
+                pMicFormat = IntPtr.Zero;
+            }
+        }
+
+        private static bool TryInitRenderAndLoop(
+            IMMDeviceEnumerator enumerator,
+            Guid iidClient,
+            Guid iidRender,
+            Guid iidCapture,
+            Guid emptyGuid,
+            ref IAudioClient renderClient,
+            ref IAudioRenderClient audioRender,
+            ref uint renderBufferSize,
+            ref IAudioClient loopClient,
+            ref IAudioCaptureClient loopCapture,
+            ref IntPtr pSysFormat,
+            ref int sysChannels,
+            ref int sysBitsPerSample,
+            ref bool sysIsFloat)
+        {
+            try {
+                IMMDevice dev;
+                if (enumerator.GetDefaultAudioEndpoint(EDataFlow.eRender, ERole.eMultimedia, out dev) == 0 && dev != null) {
+                    IntPtr pRenderClientObj;
+                    if (dev.Activate(iidClient, 1, IntPtr.Zero, out pRenderClientObj) == 0 && pRenderClientObj != IntPtr.Zero) {
+                        renderClient = (IAudioClient)Marshal.GetObjectForIUnknown(pRenderClientObj);
+                        if (renderClient.GetMixFormat(out pSysFormat) == 0 && pSysFormat != IntPtr.Zero) {
+                            var wf = (WAVEFORMATEX)Marshal.PtrToStructure(pSysFormat, typeof(WAVEFORMATEX));
+                            sysChannels = wf.nChannels;
+                            sysBitsPerSample = wf.wBitsPerSample;
+                            sysIsFloat = (wf.wFormatTag == 3 /* IEEE_FLOAT */ || wf.wFormatTag == 0xFFFE);
+
+                            if (renderClient.Initialize(0, 0, 10000000, 0, pSysFormat, emptyGuid) == 0) {
+                                IntPtr pRender;
+                                if (renderClient.GetService(iidRender, out pRender) == 0 && pRender != IntPtr.Zero) {
+                                    audioRender = (IAudioRenderClient)Marshal.GetObjectForIUnknown(pRender);
+                                    renderClient.GetBufferSize(out renderBufferSize);
+                                    IntPtr pRData;
+                                    if (audioRender.GetBuffer(renderBufferSize, out pRData) == 0) {
+                                        audioRender.ReleaseBuffer(renderBufferSize, AUDCLNT_BUFFERFLAGS_SILENT);
+                                    }
+                                    renderClient.Start();
+                                }
+                            }
+                        }
+                    }
+
+                    IntPtr pLoopClientObj;
+                    if (dev.Activate(iidClient, 1, IntPtr.Zero, out pLoopClientObj) == 0 && pLoopClientObj != IntPtr.Zero) {
+                        loopClient = (IAudioClient)Marshal.GetObjectForIUnknown(pLoopClientObj);
+                        if (pSysFormat != IntPtr.Zero && loopClient.Initialize(0, AUDCLNT_STREAMFLAGS_LOOPBACK, 10000000, 0, pSysFormat, emptyGuid) == 0) {
+                            IntPtr pCap;
+                            if (loopClient.GetService(iidCapture, out pCap) == 0 && pCap != IntPtr.Zero) {
+                                loopCapture = (IAudioCaptureClient)Marshal.GetObjectForIUnknown(pCap);
+                                loopClient.Start();
+                                return true;
+                            }
+                        }
+                    }
+                }
+            } catch { }
+            ReleaseRenderAndLoop(ref renderClient, ref audioRender, ref loopClient, ref loopCapture, ref pSysFormat);
+            return false;
+        }
+
+        private static bool TryInitMic(
+            IMMDeviceEnumerator enumerator,
+            string micDeviceId,
+            Guid iidClient,
+            Guid iidCapture,
+            Guid emptyGuid,
+            ref IAudioClient micClient,
+            ref IAudioCaptureClient micCapture,
+            ref IntPtr pMicFormat,
+            ref int micChannels,
+            ref int micBitsPerSample,
+            ref bool micIsFloat)
+        {
+            try {
+                IMMDevice micDev = null;
+                if (!string.IsNullOrEmpty(micDeviceId) && micDeviceId != "default" && micDeviceId != "none") {
+                    try {
+                        enumerator.GetDevice(micDeviceId, out micDev);
+                    } catch {
+                        micDev = null;
+                    }
+                }
+                if (micDev == null) {
+                    enumerator.GetDefaultAudioEndpoint(EDataFlow.eCapture, ERole.eMultimedia, out micDev);
+                }
+                if (micDev != null) {
+                    IntPtr pMicClientObj;
+                    if (micDev.Activate(iidClient, 1, IntPtr.Zero, out pMicClientObj) == 0 && pMicClientObj != IntPtr.Zero) {
+                        micClient = (IAudioClient)Marshal.GetObjectForIUnknown(pMicClientObj);
+                        if (micClient.GetMixFormat(out pMicFormat) == 0 && pMicFormat != IntPtr.Zero) {
+                            var mwf = (WAVEFORMATEX)Marshal.PtrToStructure(pMicFormat, typeof(WAVEFORMATEX));
+                            micChannels = mwf.nChannels;
+                            micBitsPerSample = mwf.wBitsPerSample;
+                            micIsFloat = (mwf.wFormatTag == 3 || mwf.wFormatTag == 0xFFFE);
+
+                            if (micClient.Initialize(0, 0, 10000000, 0, pMicFormat, emptyGuid) == 0) {
+                                IntPtr pCap;
+                                if (micClient.GetService(iidCapture, out pCap) == 0 && pCap != IntPtr.Zero) {
+                                    micCapture = (IAudioCaptureClient)Marshal.GetObjectForIUnknown(pCap);
+                                    micClient.Start();
+                                    return true;
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch { }
+            ReleaseMic(ref micClient, ref micCapture, ref pMicFormat);
+            return false;
         }
 
         private void ExtractSystemSamples(

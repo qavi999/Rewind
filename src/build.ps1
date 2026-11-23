@@ -1,12 +1,25 @@
 ﻿param(
-    [string]$Version = "0.5"
+    [string]$Release = "v0.2",
+    [string]$Build = "0.7",
+    [string]$Version = ""
 )
 
 $ErrorActionPreference = "Stop"
 
+if (![string]::IsNullOrEmpty($Version)) {
+    if ($Version -match "^(v?[\d\.]+)[\\/]([\d\.]+)$") {
+        $Release = $matches[1]
+        $Build = $matches[2]
+    } elseif ($Version.StartsWith("v")) {
+        $Release = $Version
+    } else {
+        $Release = "v$Version"
+    }
+}
+
 $rootDir = Split-Path -Parent $PSScriptRoot
 $srcDir = Join-Path $rootDir "src"
-$buildDir = Join-Path $rootDir "builds\$Version"
+$buildDir = Join-Path $rootDir "builds\$Release\$Build"
 $toolsDir = Join-Path $rootDir "tools"
 
 if (!(Test-Path $buildDir)) {
@@ -31,6 +44,7 @@ $csc = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
 $wpf = "C:\Windows\Microsoft.NET\Framework64\v4.0.30319\WPF"
 
 $sources = @(
+    "$srcDir\AssemblyInfo.cs",
     "$srcDir\Settings.cs",
     "$srcDir\AppLocalization.cs",
     "$srcDir\NativeMethods.cs",
@@ -71,7 +85,7 @@ if (Test-Path "$buildDir\Rewind.exe") {
     Remove-Item "$buildDir\Rewind.exe" -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host "Kompilacja samodzielnego Rewind v$Version (Standalone All-In-One EXE)..." -ForegroundColor Cyan
+Write-Host "Kompilacja samodzielnego Rewind $Release ($Build) (Standalone All-In-One EXE)..." -ForegroundColor Cyan
 $cmdArgs = @($targetArg, $platformArg, $optimizeArg, $iconArg, $resFfmpeg, $resIcon, $resSound, $outArg) + $refs + $sources
 & $csc $cmdArgs
 
@@ -81,7 +95,7 @@ if ($LASTEXITCODE -eq 0 -and (Test-Path "$buildDir\Rewind.exe")) {
 
     # Kompilacja instalatora RewindSetup.exe
     Write-Host "Kompilacja instalatora RewindSetup.exe..." -ForegroundColor Cyan
-    $installerSources = @("$srcDir\Installer.cs")
+    $installerSources = @("$srcDir\AssemblyInfo.cs", "$srcDir\Installer.cs")
     $installerOutArg = "/out:`"$buildDir\RewindSetup.exe`""
     $resPayload = "/resource:`"$buildDir\Rewind.exe`",rewind_payload.exe"
     $installerArgs = @($targetArg, $platformArg, $optimizeArg, $iconArg, $resIcon, $resPayload, $installerOutArg) + $refs + $installerSources
@@ -92,21 +106,90 @@ if ($LASTEXITCODE -eq 0 -and (Test-Path "$buildDir\Rewind.exe")) {
         Write-Host "Sukces! Instalator gotowy: $buildDir\RewindSetup.exe ($setupSizeMB MB)" -ForegroundColor Green
     }
 
-    # Clean any stale non-exe files from build directory
-    Get-ChildItem -Path $buildDir -File | Where-Object { $_.Name -ne "Rewind.exe" -and $_.Name -ne "RewindSetup.exe" } | Remove-Item -Force -ErrorAction SilentlyContinue
+    # =========================================================================
+    # Budowanie i pakowanie wersji dla systemu Linux
+    # =========================================================================
+    Write-Host "Pakowanie wersji dla systemu Linux..." -ForegroundColor Cyan
+    $srcLinux = Join-Path $srcDir "linux"
+    $assetsB64 = Join-Path $srcLinux "assets_b64.py"
+    $rewindPy = Join-Path $srcLinux "rewind.py"
+    $logoPng = Join-Path $rootDir "assets\logo.png"
 
-    # Refresh Windows Shell Icon Cache
-    try {
-        Add-Type -TypeDefinition @"
-        using System;
-        using System.Runtime.InteropServices;
-        public class ShellNotify {
-            [DllImport("shell32.dll")]
-            public static extern void SHChangeNotify(int wEventId, int uFlags, IntPtr dwItem1, IntPtr dwItem2);
+    if ((Test-Path $assetsB64) -and (Test-Path $rewindPy)) {
+        $assetsContent = [System.IO.File]::ReadAllText($assetsB64, [System.Text.Encoding]::UTF8)
+        $rewindContent = [System.IO.File]::ReadAllText($rewindPy, [System.Text.Encoding]::UTF8)
+        if ($rewindContent.Contains("from assets_b64 import")) {
+            $rewindContent = $rewindContent -replace 'try:\s+from assets_b64 import[^\n]+\nexcept ImportError:\s+CLIP_WAV_B64 = ""\s+LOGO_PNG_B64 = ""', $assetsContent
         }
-"@
-        [ShellNotify]::SHChangeNotify(0x08000000, 0, [IntPtr]::Zero, [IntPtr]::Zero)
-    } catch {}
+        $rewindContent = $rewindContent.Replace("`r`n", "`n")
+
+        $standaloneBin = Join-Path $buildDir "rewind-linux"
+        [System.IO.File]::WriteAllText($standaloneBin, $rewindContent, (New-Object System.Text.UTF8Encoding($false)))
+
+        Copy-Item (Join-Path $srcLinux "install.sh") (Join-Path $buildDir "install.sh") -Force
+        Copy-Item (Join-Path $srcLinux "uninstall.sh") (Join-Path $buildDir "uninstall.sh") -Force
+        Copy-Item (Join-Path $srcLinux "rewind.desktop") (Join-Path $buildDir "rewind.desktop") -Force
+
+        # Ensure shell scripts have LF line endings
+        foreach ($fName in @("install.sh", "uninstall.sh", "rewind.desktop")) {
+            $fPath = Join-Path $buildDir $fName
+            if (Test-Path $fPath) {
+                $txt = [System.IO.File]::ReadAllText($fPath).Replace("`r`n", "`n")
+                [System.IO.File]::WriteAllText($fPath, $txt, (New-Object System.Text.UTF8Encoding($false)))
+            }
+        }
+
+        # Create tar.gz archive
+        $tarArchiveName = "Rewind-$Release-Linux.tar.gz"
+        $tempPackDir = Join-Path $env:TEMP "rewind_linux_pack_$( [Guid]::NewGuid().ToString('N') )"
+        $subPackDir = Join-Path $tempPackDir "Rewind-$Release-Linux"
+        New-Item -ItemType Directory -Path $subPackDir -Force | Out-Null
+
+        Copy-Item $standaloneBin (Join-Path $subPackDir "rewind-linux") -Force
+        Copy-Item (Join-Path $srcLinux "install.sh") (Join-Path $subPackDir "install.sh") -Force
+        Copy-Item (Join-Path $srcLinux "uninstall.sh") (Join-Path $subPackDir "uninstall.sh") -Force
+        Copy-Item (Join-Path $srcLinux "rewind.desktop") (Join-Path $subPackDir "rewind.desktop") -Force
+        Copy-Item (Join-Path $srcLinux "README.md") (Join-Path $subPackDir "README.md") -Force
+        if (Test-Path $logoPng) {
+            Copy-Item $logoPng (Join-Path $subPackDir "icon.png") -Force
+        }
+
+        foreach ($fName in @("install.sh", "uninstall.sh", "rewind.desktop", "rewind-linux")) {
+            $fPath = Join-Path $subPackDir $fName
+            if (Test-Path $fPath) {
+                $txt = [System.IO.File]::ReadAllText($fPath).Replace("`r`n", "`n")
+                [System.IO.File]::WriteAllText($fPath, $txt, (New-Object System.Text.UTF8Encoding($false)))
+            }
+        }
+
+        $tarOut = Join-Path $buildDir $tarArchiveName
+        Push-Location $tempPackDir
+        try {
+            & tar.exe -czf $tarArchiveName "Rewind-$Release-Linux"
+            Copy-Item $tarArchiveName $tarOut -Force
+        } finally {
+            Pop-Location
+            Remove-Item -Path $tempPackDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
+
+        $tarSizeKB = [math]::Round((Get-Item $tarOut).Length / 1KB, 1)
+        Write-Host "Sukces! Pakiet Linux gotowy: $tarOut ($tarSizeKB KB)" -ForegroundColor Green
+    }
+
+    # Clean any stale files from build directory
+    $validFiles = @("Rewind.exe", "RewindSetup.exe", "rewind-linux", "install.sh", "uninstall.sh", "rewind.desktop", "Rewind-$Release-Linux.tar.gz")
+    Get-ChildItem -Path $buildDir -File | Where-Object { $validFiles -notcontains $_.Name } | Remove-Item -Force -ErrorAction SilentlyContinue
+
+    # Mirror to v.02 if Release is v0.2 so both folder name formats exist
+    if ($Release -eq "v0.2") {
+        $altDir = Join-Path $rootDir "builds\v.02\$Build"
+        if (!(Test-Path $altDir)) {
+            New-Item -ItemType Directory -Path $altDir -Force | Out-Null
+        }
+        Get-ChildItem -Path $buildDir -File | ForEach-Object {
+            Copy-Item $_.FullName (Join-Path $altDir $_.Name) -Force -ErrorAction SilentlyContinue
+        }
+    }
 } else {
     Write-Host "Błąd kompilacji!" -ForegroundColor Red
     exit 1

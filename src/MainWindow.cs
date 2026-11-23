@@ -17,11 +17,13 @@ using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Markup;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 using System.Windows.Shell;
 using Application = System.Windows.Application;
 using Binding = System.Windows.Data.Binding;
 using Brush = System.Windows.Media.Brush;
+using Brushes = System.Windows.Media.Brushes;
 using Button = System.Windows.Controls.Button;
 using Color = System.Windows.Media.Color;
 using FontFamily = System.Windows.Media.FontFamily;
@@ -31,6 +33,7 @@ using MessageBox = System.Windows.MessageBox;
 using Orientation = System.Windows.Controls.Orientation;
 using Panel = System.Windows.Controls.Panel;
 using Slider = System.Windows.Controls.Slider;
+using TextBox = System.Windows.Controls.TextBox;
 
 namespace ClipFlow {
     // -------------------------------------------------------------------------
@@ -187,30 +190,30 @@ namespace ClipFlow {
             IsDarkActive = false;
             return new ThemePalette {
                 IsDark = false,
-                WindowBg = new SolidColorBrush(Color.FromRgb(246, 246, 248)),
-                WindowBorder = new SolidColorBrush(Color.FromRgb(218, 220, 226)),
-                SidebarBg = new SolidColorBrush(Color.FromRgb(238, 239, 243)),
-                SidebarBorder = new SolidColorBrush(Color.FromRgb(224, 226, 232)),
-                ContentBg = new SolidColorBrush(Color.FromRgb(246, 246, 248)),
+                WindowBg = new SolidColorBrush(Color.FromRgb(246, 247, 250)),
+                WindowBorder = new SolidColorBrush(Color.FromRgb(215, 218, 226)),
+                SidebarBg = new SolidColorBrush(Color.FromRgb(237, 239, 244)),
+                SidebarBorder = new SolidColorBrush(Color.FromRgb(220, 223, 230)),
+                ContentBg = new SolidColorBrush(Color.FromRgb(246, 247, 250)),
                 CardBg = new SolidColorBrush(Color.FromRgb(255, 255, 255)),
-                CardBorder = new SolidColorBrush(Color.FromRgb(226, 228, 234)),
-                RowDivider = new SolidColorBrush(Color.FromRgb(240, 241, 245)),
-                TextPrimary = new SolidColorBrush(Color.FromRgb(20, 20, 24)),
-                TextSecondary = new SolidColorBrush(Color.FromRgb(100, 102, 112)),
-                TextMuted = new SolidColorBrush(Color.FromRgb(140, 142, 150)),
-                InputBg = new SolidColorBrush(Color.FromRgb(243, 244, 247)),
-                InputBorder = new SolidColorBrush(Color.FromRgb(215, 218, 226)),
-                ButtonBg = new SolidColorBrush(Color.FromRgb(242, 243, 246)),
-                ButtonBorder = new SolidColorBrush(Color.FromRgb(216, 218, 226)),
-                ButtonHoverBg = new SolidColorBrush(Color.FromRgb(230, 232, 238)),
-                PillUnselectedBg = new SolidColorBrush(Color.FromRgb(238, 240, 244)),
-                PillUnselectedBorder = new SolidColorBrush(Color.FromRgb(218, 220, 228)),
-                PillUnselectedFg = new SolidColorBrush(Color.FromRgb(90, 92, 102)),
+                CardBorder = new SolidColorBrush(Color.FromRgb(222, 225, 234)),
+                RowDivider = new SolidColorBrush(Color.FromRgb(232, 235, 242)),
+                TextPrimary = new SolidColorBrush(Color.FromRgb(18, 18, 24)),
+                TextSecondary = new SolidColorBrush(Color.FromRgb(92, 95, 108)),
+                TextMuted = new SolidColorBrush(Color.FromRgb(136, 140, 152)),
+                InputBg = new SolidColorBrush(Color.FromRgb(244, 245, 249)),
+                InputBorder = new SolidColorBrush(Color.FromRgb(208, 212, 222)),
+                ButtonBg = new SolidColorBrush(Color.FromRgb(243, 245, 249)),
+                ButtonBorder = new SolidColorBrush(Color.FromRgb(212, 216, 226)),
+                ButtonHoverBg = new SolidColorBrush(Color.FromRgb(230, 233, 242)),
+                PillUnselectedBg = new SolidColorBrush(Color.FromRgb(238, 240, 246)),
+                PillUnselectedBorder = new SolidColorBrush(Color.FromRgb(214, 218, 228)),
+                PillUnselectedFg = new SolidColorBrush(Color.FromRgb(70, 74, 86)),
                 AccentCoral = new SolidColorBrush(Color.FromRgb(124, 58, 237)),
-                AccentCoralSoft = new SolidColorBrush(Color.FromArgb(28, 124, 58, 237)),
-                StatusBadgeBg = new SolidColorBrush(Color.FromArgb(25, 22, 163, 74)),
-                StatusBadgeBorder = new SolidColorBrush(Color.FromRgb(22, 163, 74)),
-                StatusBadgeFg = new SolidColorBrush(Color.FromRgb(21, 128, 61))
+                AccentCoralSoft = new SolidColorBrush(Color.FromRgb(237, 230, 255)),
+                StatusBadgeBg = new SolidColorBrush(Color.FromArgb(35, 16, 185, 129)),
+                StatusBadgeBorder = new SolidColorBrush(Color.FromRgb(16, 185, 129)),
+                StatusBadgeFg = new SolidColorBrush(Color.FromRgb(16, 120, 60))
             };
         }
     }
@@ -454,6 +457,7 @@ namespace ClipFlow {
         private bool _isExiting;
         private IntPtr _hwnd;
         private HwndSource _hwndSource;
+        private static readonly uint WM_SHOWME = NativeMethods.RegisterWindowMessage(NativeMethods.REWIND_SHOW_MESSAGE_NAME);
 
         // Active Navigation
         private int _activeCategoryIndex = 0;
@@ -488,6 +492,12 @@ namespace ClipFlow {
 
         // Video Settings Controls
         private TextBlock _screenDropdownText;
+        private Border _durationContainer;
+        private Border _fpsContainer;
+        private Border _bitrateContainer;
+        private StackPanel _durationPillsStack;
+        private StackPanel _fpsPillsStack;
+        private StackPanel _bitratePillsStack;
         private List<Button> _durationButtons = new List<Button>();
         private List<Button> _fpsButtons = new List<Button>();
         private List<Button> _bitrateButtons = new List<Button>();
@@ -499,10 +509,16 @@ namespace ClipFlow {
         private TextBlock _micVolLabel;
         private Slider _sysVolSlider;
         private Slider _micVolSlider;
+        private Border _sysVolContainer;
+        private Border _micVolContainer;
+        private StackPanel _sysVolBox;
+        private StackPanel _micVolBox;
         private List<Button> _soundPresetButtons = new List<Button>();
         private TextBlock _customSoundPathText;
 
         // Hotkeys, System & Theme Controls
+        private Border _hotkeyContainer;
+        private StackPanel _hotkeyPillsStack;
         private List<Button> _hotkeyButtons = new List<Button>();
         private List<Button> _themeButtons = new List<Button>();
         private Button _toggleBufferBtn;
@@ -532,7 +548,7 @@ namespace ClipFlow {
             _L = AppLocalization.Get(langCode);
 
             BuildRaycastPreferencesLayout();
-            SwitchCategory(_activeCategoryIndex);
+            SwitchCategory(_activeCategoryIndex, false);
             InitTrayIcon();
             UpdateHeroTitle();
             if (_sidebarStatusText != null) {
@@ -552,7 +568,7 @@ namespace ClipFlow {
             }
             ApplyModernScrollbarStyle(isDark);
             BuildRaycastPreferencesLayout();
-            SwitchCategory(_activeCategoryIndex);
+            SwitchCategory(_activeCategoryIndex, false);
         }
 
         private void ApplyModernScrollbarStyle(bool isDark) {
@@ -860,15 +876,15 @@ namespace ClipFlow {
             brandStack.Children.Add(titleText);
 
             var verBadge = new Border {
-                Background = _theme.PillUnselectedBg,
-                BorderBrush = _theme.PillUnselectedBorder,
+                Background = _theme.IsDark ? _theme.PillUnselectedBg : new SolidColorBrush(Color.FromRgb(225, 228, 236)),
+                BorderBrush = _theme.IsDark ? _theme.PillUnselectedBorder : new SolidColorBrush(Color.FromRgb(206, 210, 222)),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(5),
                 Padding = new Thickness(5, 1, 5, 1),
                 Margin = new Thickness(8, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center,
                 Child = new TextBlock {
-                    Text = "v0.1",
+                    Text = "v0.2",
                     FontSize = 10,
                     FontWeight = FontWeights.SemiBold,
                     Foreground = _theme.TextSecondary
@@ -911,8 +927,8 @@ namespace ClipFlow {
 
             // Bottom Status Card
             var footerBorder = new Border {
-                Background = _theme.CardBg,
-                BorderBrush = _theme.CardBorder,
+                Background = _theme.IsDark ? _theme.CardBg : new SolidColorBrush(Color.FromRgb(248, 249, 252)),
+                BorderBrush = _theme.IsDark ? _theme.CardBorder : new SolidColorBrush(Color.FromRgb(218, 221, 230)),
                 BorderThickness = new Thickness(1),
                 CornerRadius = new CornerRadius(12),
                 Margin = new Thickness(12, 6, 12, 12),
@@ -922,18 +938,21 @@ namespace ClipFlow {
             var footerStack = new StackPanel { Orientation = Orientation.Vertical };
 
             var statusRow = new StackPanel { Orientation = Orientation.Horizontal };
+            bool isRec = (_engine != null && _engine.IsRecording);
             _sidebarStatusDot = new System.Windows.Shapes.Ellipse {
                 Width = 7,
                 Height = 7,
-                Fill = new SolidColorBrush(Color.FromRgb(34, 197, 94)),
+                Fill = isRec ? new SolidColorBrush(Color.FromRgb(34, 197, 94)) : new SolidColorBrush(Color.FromRgb(245, 158, 11)),
                 Margin = new Thickness(0, 0, 6, 0),
                 VerticalAlignment = VerticalAlignment.Center
             };
             _sidebarStatusText = new TextBlock {
-                Text = _settings.BufferActive ? _L.SidebarStatusActive : _L.SidebarStatusPaused,
+                Text = isRec ? _L.SidebarStatusActive : _L.SidebarStatusPaused,
                 FontSize = 11,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = _theme.StatusBadgeFg,
+                Foreground = isRec
+                    ? (_theme.IsDark ? new SolidColorBrush(Color.FromRgb(209, 250, 229)) : new SolidColorBrush(Color.FromRgb(16, 120, 60)))
+                    : (_theme.IsDark ? new SolidColorBrush(Color.FromRgb(254, 243, 199)) : new SolidColorBrush(Color.FromRgb(180, 83, 9))),
                 VerticalAlignment = VerticalAlignment.Center
             };
             statusRow.Children.Add(_sidebarStatusDot);
@@ -996,10 +1015,10 @@ namespace ClipFlow {
             var tb = btn.Content as TextBlock;
             if (isActive) {
                 btn.Background = _theme.IsDark ? new SolidColorBrush(Color.FromRgb(34, 34, 34)) : new SolidColorBrush(Color.FromRgb(255, 255, 255));
-                btn.BorderBrush = _theme.IsDark ? new SolidColorBrush(Color.FromRgb(56, 56, 56)) : new SolidColorBrush(Color.FromRgb(218, 220, 228));
+                btn.BorderBrush = _theme.IsDark ? new SolidColorBrush(Color.FromRgb(56, 56, 56)) : new SolidColorBrush(Color.FromRgb(205, 208, 218));
                 btn.BorderThickness = new Thickness(1);
                 if (tb != null) {
-                    tb.Foreground = _theme.IsDark ? System.Windows.Media.Brushes.White : new SolidColorBrush(Color.FromRgb(20, 20, 24));
+                    tb.Foreground = _theme.IsDark ? System.Windows.Media.Brushes.White : new SolidColorBrush(Color.FromRgb(18, 18, 24));
                     tb.FontWeight = FontWeights.SemiBold;
                 }
             } else {
@@ -1019,7 +1038,8 @@ namespace ClipFlow {
             return (idx >= 0) ? nav.Substring(idx + 2).Trim() : nav.Trim();
         }
 
-        private void SwitchCategory(int index) {
+        private void SwitchCategory(int index, bool animate = true) {
+            int prevIndex = _activeCategoryIndex;
             _activeCategoryIndex = index;
             for (int i = 0; i < _navButtons.Count; i++) {
                 ApplySidebarNavStyle(_navButtons[i], i == index);
@@ -1034,20 +1054,101 @@ namespace ClipFlow {
                 _L.NavAbout
             };
 
-            if (index >= 0 && index < categoryNames.Length) {
+            if (index >= 0 && index < categoryNames.Length && _breadcrumbText != null) {
                 _breadcrumbText.Text = "Rewind › " + CleanNavTitle(categoryNames[index]);
+                if (animate && prevIndex != index) {
+                    var breadcrumbAnim = new DoubleAnimation {
+                        From = 0.35,
+                        To = 1.0,
+                        Duration = TimeSpan.FromMilliseconds(140),
+                        EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                    };
+                    _breadcrumbText.BeginAnimation(UIElement.OpacityProperty, breadcrumbAnim);
+                }
             }
 
-            _viewClips.Visibility = (index == 0) ? Visibility.Visible : Visibility.Collapsed;
-            _viewVideo.Visibility = (index == 1) ? Visibility.Visible : Visibility.Collapsed;
-            _viewAudio.Visibility = (index == 2) ? Visibility.Visible : Visibility.Collapsed;
-            _viewHotkeys.Visibility = (index == 3) ? Visibility.Visible : Visibility.Collapsed;
-            _viewSystem.Visibility = (index == 4) ? Visibility.Visible : Visibility.Collapsed;
-            _viewAbout.Visibility = (index == 5) ? Visibility.Visible : Visibility.Collapsed;
+            FrameworkElement[] views = new FrameworkElement[] {
+                _viewClips,
+                _viewVideo,
+                _viewAudio,
+                _viewHotkeys,
+                _viewSystem,
+                _viewAbout
+            };
+
+            for (int i = 0; i < views.Length; i++) {
+                var v = views[i];
+                if (v != null && i != index) {
+                    v.BeginAnimation(UIElement.OpacityProperty, null);
+                    var oldTt = v.RenderTransform as TranslateTransform;
+                    if (oldTt != null) {
+                        oldTt.BeginAnimation(TranslateTransform.YProperty, null);
+                        oldTt.Y = 0;
+                    }
+                    v.Opacity = 1.0;
+                    v.Visibility = Visibility.Collapsed;
+                }
+            }
+
+            if (index >= 0 && index < views.Length && views[index] != null) {
+                var targetView = views[index];
+                targetView.Visibility = Visibility.Visible;
+
+                if (animate && prevIndex != index) {
+                    double fromY = (index > prevIndex) ? 8.0 : -8.0;
+                    AnimateViewEntrance(targetView, fromY);
+                } else {
+                    targetView.BeginAnimation(UIElement.OpacityProperty, null);
+                    targetView.Opacity = 1.0;
+                    var tt = targetView.RenderTransform as TranslateTransform;
+                    if (tt != null) {
+                        tt.BeginAnimation(TranslateTransform.YProperty, null);
+                        tt.Y = 0;
+                    }
+                }
+            }
 
             if (index == 0) {
                 RefreshClipsList();
             }
+        }
+
+        private void AnimateViewEntrance(FrameworkElement view, double fromY) {
+            if (view == null) return;
+
+            var tt = view.RenderTransform as TranslateTransform;
+            if (tt == null) {
+                tt = new TranslateTransform();
+                view.RenderTransform = tt;
+            }
+
+            var ease = new CubicEase { EasingMode = EasingMode.EaseOut };
+
+            var opacityAnim = new DoubleAnimation {
+                From = 0.0,
+                To = 1.0,
+                Duration = TimeSpan.FromMilliseconds(150),
+                EasingFunction = ease
+            };
+
+            var slideAnim = new DoubleAnimation {
+                From = fromY,
+                To = 0.0,
+                Duration = TimeSpan.FromMilliseconds(160),
+                EasingFunction = ease
+            };
+
+            slideAnim.Completed += delegate {
+                tt.BeginAnimation(TranslateTransform.YProperty, null);
+                tt.Y = 0;
+            };
+            opacityAnim.Completed += delegate {
+                view.BeginAnimation(UIElement.OpacityProperty, null);
+                view.Opacity = 1.0;
+            };
+
+            view.BeginAnimation(UIElement.OpacityProperty, opacityAnim);
+            tt.BeginAnimation(TranslateTransform.YProperty, slideAnim);
         }
 
         private FrameworkElement CreateRightPanel() {
@@ -1096,7 +1197,7 @@ namespace ClipFlow {
             grid.Children.Add(captionGrid);
 
             // 2. View Container
-            _contentArea = new Grid();
+            _contentArea = new Grid { ClipToBounds = true };
 
             _viewClips = CreateClipsView();
             _viewVideo = CreateVideoSettingsView();
@@ -1434,8 +1535,12 @@ namespace ClipFlow {
             ));
             cardStack.Children.Add(CreateRowDivider());
 
+            _durationContainer = new Border { VerticalAlignment = VerticalAlignment.Center };
+            _fpsContainer = new Border { VerticalAlignment = VerticalAlignment.Center };
+            _bitrateContainer = new Border { VerticalAlignment = VerticalAlignment.Center };
+
             // Długość bufora
-            var durStack = new StackPanel { Orientation = Orientation.Horizontal };
+            _durationPillsStack = new StackPanel { Orientation = Orientation.Horizontal };
             int[] durations = new int[] { 15, 30, 60, 120 };
             _durationButtons.Clear();
             foreach (var d in durations) {
@@ -1449,17 +1554,17 @@ namespace ClipFlow {
                     RestartBufferWithNewSettings();
                 };
                 _durationButtons.Add(btn);
-                durStack.Children.Add(btn);
+                _durationPillsStack.Children.Add(btn);
             }
             cardStack.Children.Add(CreateRaycastSettingsRow(
                 _L.VideoDurationTitle,
                 _L.VideoDurationSub,
-                durStack
+                _durationContainer
             ));
             cardStack.Children.Add(CreateRowDivider());
 
             // Płynność (FPS)
-            var fpsStack = new StackPanel { Orientation = Orientation.Horizontal };
+            _fpsPillsStack = new StackPanel { Orientation = Orientation.Horizontal };
             int[] fpsList = new int[] { 30, 60, 120, 144 };
             _fpsButtons.Clear();
             foreach (var f in fpsList) {
@@ -1472,17 +1577,17 @@ namespace ClipFlow {
                     RestartBufferWithNewSettings();
                 };
                 _fpsButtons.Add(btn);
-                fpsStack.Children.Add(btn);
+                _fpsPillsStack.Children.Add(btn);
             }
             cardStack.Children.Add(CreateRaycastSettingsRow(
                 _L.VideoFpsTitle,
                 _L.VideoFpsSub,
-                fpsStack
+                _fpsContainer
             ));
             cardStack.Children.Add(CreateRowDivider());
 
             // Bitrate wideo
-            var bitStack = new StackPanel { Orientation = Orientation.Horizontal };
+            _bitratePillsStack = new StackPanel { Orientation = Orientation.Horizontal };
             string[] bitrates = new string[] { "8M", "12M", "16M" };
             _bitrateButtons.Clear();
             foreach (var b in bitrates) {
@@ -1495,14 +1600,16 @@ namespace ClipFlow {
                     RestartBufferWithNewSettings();
                 };
                 _bitrateButtons.Add(btn);
-                bitStack.Children.Add(btn);
+                _bitratePillsStack.Children.Add(btn);
             }
             cardStack.Children.Add(CreateRaycastSettingsRow(
                 _L.VideoBitrateTitle,
                 _L.VideoBitrateSub,
-                bitStack
+                _bitrateContainer
             ));
             cardStack.Children.Add(CreateRowDivider());
+
+            UpdateVideoSettingsControls();
 
             // Kursor myszy
             var cursorToggle = new RaycastToggle(_settings.CaptureCursor);
@@ -1639,11 +1746,12 @@ namespace ClipFlow {
             cardStack.Children.Add(CreateRowDivider());
 
             // Głośność gry
-            var sysVolBox = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            _sysVolContainer = new Border();
+            _sysVolBox = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             _sysVolSlider = new Slider {
                 Minimum = 0,
                 Maximum = 150,
-                Value = _settings.SystemVolumePercent,
+                Value = Math.Min(150, _settings.SystemVolumePercent),
                 IsSnapToTickEnabled = true,
                 TickFrequency = 5,
                 Width = 140,
@@ -1668,22 +1776,24 @@ namespace ClipFlow {
                 _engine.UpdateAudioVolumes(_settings.SystemVolumePercent, _settings.MicVolumePercent);
             };
             _sysVolSlider.PreviewMouseUp += delegate { _settings.Save(); };
-            sysVolBox.Children.Add(_sysVolSlider);
-            sysVolBox.Children.Add(_sysVolLabel);
+            _sysVolBox.Children.Add(_sysVolSlider);
+            _sysVolBox.Children.Add(_sysVolLabel);
+            _sysVolContainer.Child = _sysVolBox;
 
             cardStack.Children.Add(CreateRaycastSettingsRow(
                 _L.AudioSysVolTitle,
                 _L.AudioSysVolSub,
-                sysVolBox
+                _sysVolContainer
             ));
             cardStack.Children.Add(CreateRowDivider());
 
             // Głośność mikrofonu
-            var micVolBox = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            _micVolContainer = new Border();
+            _micVolBox = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             _micVolSlider = new Slider {
                 Minimum = 0,
                 Maximum = 150,
-                Value = _settings.MicVolumePercent,
+                Value = Math.Min(150, _settings.MicVolumePercent),
                 IsSnapToTickEnabled = true,
                 TickFrequency = 5,
                 Width = 140,
@@ -1708,13 +1818,28 @@ namespace ClipFlow {
                 _engine.UpdateAudioVolumes(_settings.SystemVolumePercent, _settings.MicVolumePercent);
             };
             _micVolSlider.PreviewMouseUp += delegate { _settings.Save(); };
-            micVolBox.Children.Add(_micVolSlider);
-            micVolBox.Children.Add(_micVolLabel);
+            _micVolBox.Children.Add(_micVolSlider);
+            _micVolBox.Children.Add(_micVolLabel);
+            _micVolContainer.Child = _micVolBox;
 
             cardStack.Children.Add(CreateRaycastSettingsRow(
                 _L.AudioMicVolTitle,
                 _L.AudioMicVolSub,
-                micVolBox
+                _micVolContainer
+            ));
+            cardStack.Children.Add(CreateRowDivider());
+
+            // Osobne ścieżki audio (Multi-track)
+            var multiTrackToggle = new RaycastToggle(_settings.SeparateAudioTracks);
+            multiTrackToggle.CheckedChanged += delegate(bool isChecked) {
+                _settings.SeparateAudioTracks = isChecked;
+                _settings.Save();
+                RestartBufferWithNewSettings();
+            };
+            cardStack.Children.Add(CreateRaycastSettingsRow(
+                _L.AudioSeparateTracksTitle,
+                _L.AudioSeparateTracksSub,
+                multiTrackToggle
             ));
 
             card.Child = cardStack;
@@ -1835,6 +1960,8 @@ namespace ClipFlow {
             soundCard.Child = soundStack;
             rootStack.Children.Add(soundCard);
 
+            UpdateAudioSettingsControls();
+
             scroll.Content = rootStack;
             return scroll;
         }
@@ -1855,7 +1982,8 @@ namespace ClipFlow {
             var card = CreateSettingsCard();
             var cardStack = new StackPanel { Orientation = Orientation.Vertical };
 
-            var hkStack = new StackPanel { Orientation = Orientation.Horizontal };
+            _hotkeyContainer = new Border { VerticalAlignment = VerticalAlignment.Center };
+            _hotkeyPillsStack = new StackPanel { Orientation = Orientation.Horizontal };
             string[] hotkeys = new string[] { "F8", "F9", "F10", "Alt+C" };
             _hotkeyButtons.Clear();
             foreach (var h in hotkeys) {
@@ -1869,12 +1997,14 @@ namespace ClipFlow {
                     RegisterGlobalHotkey();
                 };
                 _hotkeyButtons.Add(btn);
-                hkStack.Children.Add(btn);
+                _hotkeyPillsStack.Children.Add(btn);
             }
+            UpdateHotkeyControls();
+
             cardStack.Children.Add(CreateRaycastSettingsRow(
                 _L.HotkeyTitle,
                 _L.HotkeySub,
-                hkStack
+                _hotkeyContainer
             ));
             cardStack.Children.Add(CreateRowDivider());
 
@@ -1901,6 +2031,69 @@ namespace ClipFlow {
             card.Child = cardStack;
             rootStack.Children.Add(card);
 
+            // Karta drugiego skrótu (Długi klip)
+            var card2 = CreateSettingsCard();
+            var card2Stack = new StackPanel { Orientation = Orientation.Vertical };
+
+            var secToggle = new RaycastToggle(_settings.SecondaryHotkeyEnabled);
+            secToggle.CheckedChanged += delegate(bool isChecked) {
+                _settings.SecondaryHotkeyEnabled = isChecked;
+                _settings.Save();
+                RegisterGlobalHotkey();
+            };
+            card2Stack.Children.Add(CreateRaycastSettingsRow(
+                _L.HotkeySecondaryTitle,
+                _L.HotkeySecondarySub,
+                secToggle
+            ));
+            card2Stack.Children.Add(CreateRowDivider());
+
+            var secHkPills = new StackPanel { Orientation = Orientation.Horizontal };
+            string[] secKeys = new string[] { "F7", "F11", "F12", "Alt+F8" };
+            var secHkButtons = new List<Button>();
+            foreach (var sk in secKeys) {
+                string keyVal = sk;
+                var btn = CreateSegmentButton(keyVal, _settings.SecondaryHotkey == keyVal);
+                btn.Click += delegate {
+                    _settings.SecondaryHotkey = keyVal;
+                    _settings.Save();
+                    UpdatePillGroup(secHkButtons, keyVal);
+                    RegisterGlobalHotkey();
+                };
+                secHkButtons.Add(btn);
+                secHkPills.Children.Add(btn);
+            }
+            card2Stack.Children.Add(CreateRaycastSettingsRow(
+                _L.HotkeySecondaryKeyTitle,
+                _L.HotkeySecondaryKeySub,
+                secHkPills
+            ));
+            card2Stack.Children.Add(CreateRowDivider());
+
+            var secDurPills = new StackPanel { Orientation = Orientation.Horizontal };
+            int[] secDurs = new int[] { 60, 120, 180, 300 };
+            var secDurButtons = new List<Button>();
+            foreach (var sd in secDurs) {
+                int durVal = sd;
+                var btn = CreateSegmentButton(durVal + "s", _settings.SecondaryClipDuration == durVal);
+                btn.Click += delegate {
+                    _settings.SecondaryClipDuration = durVal;
+                    _settings.Save();
+                    UpdatePillGroup(secDurButtons, durVal + "s");
+                    RestartBufferWithNewSettings();
+                };
+                secDurButtons.Add(btn);
+                secDurPills.Children.Add(btn);
+            }
+            card2Stack.Children.Add(CreateRaycastSettingsRow(
+                _L.HotkeySecondaryDurationTitle,
+                _L.HotkeySecondaryDurationSub,
+                secDurPills
+            ));
+
+            card2.Child = card2Stack;
+            rootStack.Children.Add(card2);
+
             scroll.Content = rootStack;
             return scroll;
         }
@@ -1918,7 +2111,28 @@ namespace ClipFlow {
             var rootStack = new StackPanel { Orientation = Orientation.Vertical };
             rootStack.Children.Add(CreateSettingsSectionHeader(_L.SectionHeaderSystem, _L.SectionHeaderSystemSub));
 
-            // 1. Karta wyglądu i nakładki HUD
+            // 1. Karta trybu zaawansowanego
+            var advCard = CreateSettingsCard();
+            var advCardStack = new StackPanel { Orientation = Orientation.Vertical };
+
+            var advToggle = new RaycastToggle(_settings.AdvancedMode);
+            advToggle.CheckedChanged += delegate(bool isChecked) {
+                _settings.AdvancedMode = isChecked;
+                _settings.Save();
+                UpdateVideoSettingsControls();
+                UpdateAudioSettingsControls();
+                UpdateHotkeyControls();
+            };
+            advCardStack.Children.Add(CreateRaycastSettingsRow(
+                _L.AdvancedModeTitle,
+                _L.AdvancedModeSub,
+                advToggle
+            ));
+
+            advCard.Child = advCardStack;
+            rootStack.Children.Add(advCard);
+
+            // 2. Karta wyglądu i nakładki HUD
             var themeCard = CreateSettingsCard();
             var themeCardStack = new StackPanel { Orientation = Orientation.Vertical };
 
@@ -2017,6 +2231,76 @@ namespace ClipFlow {
             card.Child = cardStack;
             rootStack.Children.Add(card);
 
+            // 3. Karta zarządzania miejscem na dysku (Auto Storage Limit)
+            var storageCard = CreateSettingsCard();
+            var storageStack = new StackPanel { Orientation = Orientation.Vertical };
+
+            var storageToggle = new RaycastToggle(_settings.StorageLimitEnabled);
+            storageToggle.CheckedChanged += delegate(bool isChecked) {
+                _settings.StorageLimitEnabled = isChecked;
+                _settings.Save();
+                if (isChecked) {
+                    _engine.EnforceStorageLimits();
+                }
+            };
+            storageStack.Children.Add(CreateRaycastSettingsRow(
+                _L.StorageLimitToggle,
+                _L.StorageSub,
+                storageToggle
+            ));
+            storageStack.Children.Add(CreateRowDivider());
+
+            var gbPills = new StackPanel { Orientation = Orientation.Horizontal };
+            int[] gbLimits = new int[] { 10, 25, 50, 100 };
+            var gbButtons = new List<Button>();
+            foreach (var g in gbLimits) {
+                int limitVal = g;
+                var btn = CreateSegmentButton(limitVal + " GB", _settings.MaxStorageLimitGB == limitVal);
+                btn.Click += delegate {
+                    _settings.MaxStorageLimitGB = limitVal;
+                    _settings.Save();
+                    UpdatePillGroup(gbButtons, limitVal + " GB");
+                    if (_settings.StorageLimitEnabled) {
+                        _engine.EnforceStorageLimits();
+                    }
+                };
+                gbButtons.Add(btn);
+                gbPills.Children.Add(btn);
+            }
+            storageStack.Children.Add(CreateRaycastSettingsRow(
+                _L.StorageTitle,
+                "Maksymalny łączny rozmiar folderu z powtórkami.",
+                gbPills
+            ));
+            storageStack.Children.Add(CreateRowDivider());
+
+            var agePills = new StackPanel { Orientation = Orientation.Horizontal };
+            int[] ageDays = new int[] { 0, 7, 14, 30, 60 };
+            var ageButtons = new List<Button>();
+            foreach (var a in ageDays) {
+                int ageVal = a;
+                string label = ageVal == 0 ? "Wyłączone" : (ageVal + " dni");
+                var btn = CreateSegmentButton(label, _settings.MaxClipAgeDays == ageVal);
+                btn.Click += delegate {
+                    _settings.MaxClipAgeDays = ageVal;
+                    _settings.Save();
+                    UpdatePillGroup(ageButtons, label);
+                    if (ageVal > 0) {
+                        _engine.EnforceStorageLimits();
+                    }
+                };
+                ageButtons.Add(btn);
+                agePills.Children.Add(btn);
+            }
+            storageStack.Children.Add(CreateRaycastSettingsRow(
+                _L.StorageAgeTitle,
+                _L.StorageAgeSub,
+                agePills
+            ));
+
+            storageCard.Child = storageStack;
+            rootStack.Children.Add(storageCard);
+
             scroll.Content = rootStack;
             return scroll;
         }
@@ -2040,7 +2324,7 @@ namespace ClipFlow {
             cardStack.Children.Add(CreateRaycastSettingsRow(
                 _L.AboutVersionTitle,
                 _L.AboutVersionSub,
-                new TextBlock { Text = "Rewind v0.1", FontWeight = FontWeights.Bold, Foreground = _theme.TextPrimary }
+                new TextBlock { Text = "Rewind v0.2", FontWeight = FontWeights.Bold, Foreground = _theme.TextPrimary }
             ));
             cardStack.Children.Add(CreateRowDivider());
 
@@ -2183,9 +2467,9 @@ namespace ClipFlow {
 
         private void ApplySegmentStyle(Button btn, bool isActive) {
             if (isActive) {
-                btn.Background = _theme.IsDark ? new SolidColorBrush(Color.FromRgb(44, 44, 44)) : new SolidColorBrush(Color.FromRgb(255, 255, 255));
-                btn.BorderBrush = _theme.IsDark ? new SolidColorBrush(Color.FromRgb(68, 68, 68)) : new SolidColorBrush(Color.FromRgb(200, 202, 210));
-                btn.Foreground = _theme.TextPrimary;
+                btn.Background = _theme.IsDark ? new SolidColorBrush(Color.FromRgb(44, 44, 44)) : new SolidColorBrush(Color.FromRgb(24, 24, 30));
+                btn.BorderBrush = _theme.IsDark ? new SolidColorBrush(Color.FromRgb(68, 68, 68)) : new SolidColorBrush(Color.FromRgb(24, 24, 30));
+                btn.Foreground = System.Windows.Media.Brushes.White;
                 btn.FontWeight = FontWeights.SemiBold;
             } else {
                 btn.Background = _theme.PillUnselectedBg;
@@ -2222,6 +2506,219 @@ namespace ClipFlow {
             }
             if (_notifyIcon != null) {
                 _notifyIcon.Text = string.Format("Rewind - [{0}]", _settings.Hotkey);
+            }
+        }
+
+        private FrameworkElement CreateRaycastNumericInput(string currentValue, string suffix, Action<string, TextBox> onCommit, int width, string hint) {
+            var border = new Border {
+                Background = _theme.InputBg,
+                BorderBrush = _theme.InputBorder,
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(10),
+                Height = 32,
+                Width = width,
+                Padding = new Thickness(12, 0, 10, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            if (!string.IsNullOrEmpty(suffix)) {
+                grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            }
+
+            var tb = new TextBox {
+                Text = currentValue,
+                FontSize = 12,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = _theme.TextPrimary,
+                Background = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                VerticalAlignment = VerticalAlignment.Center,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                CaretBrush = _theme.TextPrimary,
+                ToolTip = hint
+            };
+
+            tb.GotFocus += delegate {
+                border.BorderBrush = _theme.AccentCoral;
+                tb.SelectAll();
+            };
+            tb.LostFocus += delegate {
+                border.BorderBrush = _theme.InputBorder;
+                onCommit(tb.Text, tb);
+            };
+            tb.KeyDown += delegate(object sender, KeyEventArgs e) {
+                if (e.Key == Key.Enter) {
+                    border.BorderBrush = _theme.InputBorder;
+                    onCommit(tb.Text, tb);
+                    Keyboard.ClearFocus();
+                    e.Handled = true;
+                }
+            };
+
+            Grid.SetColumn(tb, 0);
+            grid.Children.Add(tb);
+
+            if (!string.IsNullOrEmpty(suffix)) {
+                var suffixBlock = new TextBlock {
+                    Text = suffix,
+                    FontSize = 11.5,
+                    Foreground = _theme.TextSecondary,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(4, 0, 0, 0)
+                };
+                Grid.SetColumn(suffixBlock, 1);
+                grid.Children.Add(suffixBlock);
+            }
+
+            border.Child = grid;
+            return border;
+        }
+
+        private void UpdateVideoSettingsControls() {
+            if (_durationContainer == null || _fpsContainer == null || _bitrateContainer == null) return;
+
+            if (_settings.AdvancedMode) {
+                _durationContainer.Child = CreateRaycastNumericInput(
+                    _settings.ClipDuration.ToString(),
+                    "s",
+                    delegate(string val, TextBox box) {
+                        int sec;
+                        string clean = (val ?? "").ToLower().Replace("sek", "").Replace("s", "").Trim();
+                        if (int.TryParse(clean, out sec)) {
+                            _settings.ClipDuration = Math.Max(5, Math.Min(600, sec));
+                            _settings.Save();
+                            UpdateHeroTitle();
+                            RestartBufferWithNewSettings();
+                        }
+                        box.Text = _settings.ClipDuration.ToString();
+                    },
+                    120,
+                    _L.CustomDurationHint
+                );
+
+                _fpsContainer.Child = CreateRaycastNumericInput(
+                    _settings.Fps.ToString(),
+                    "FPS",
+                    delegate(string val, TextBox box) {
+                        int fps;
+                        string clean = (val ?? "").ToLower().Replace("fps", "").Trim();
+                        if (int.TryParse(clean, out fps)) {
+                            _settings.Fps = Math.Max(15, Math.Min(360, fps));
+                            _settings.Save();
+                            RestartBufferWithNewSettings();
+                        }
+                        box.Text = _settings.Fps.ToString();
+                    },
+                    120,
+                    _L.CustomFpsHint
+                );
+
+                _bitrateContainer.Child = CreateRaycastNumericInput(
+                    _settings.Bitrate.Replace("M", ""),
+                    "Mbps",
+                    delegate(string val, TextBox box) {
+                        int bit;
+                        string clean = (val ?? "").ToLower().Replace("mbps", "").Replace("m", "").Trim();
+                        if (int.TryParse(clean, out bit)) {
+                            _settings.Bitrate = Math.Max(2, Math.Min(150, bit)) + "M";
+                            _settings.Save();
+                            RestartBufferWithNewSettings();
+                        }
+                        box.Text = _settings.Bitrate.Replace("M", "");
+                    },
+                    120,
+                    _L.CustomBitrateHint
+                );
+            } else {
+                UpdatePillGroup(_durationButtons, _settings.ClipDuration + "s");
+                _durationContainer.Child = _durationPillsStack;
+
+                UpdatePillGroup(_fpsButtons, _settings.Fps + " FPS");
+                _fpsContainer.Child = _fpsPillsStack;
+
+                UpdatePillGroup(_bitrateButtons, _settings.Bitrate.Replace("M", " Mbps"));
+                _bitrateContainer.Child = _bitratePillsStack;
+            }
+        }
+
+        private void UpdateHotkeyControls() {
+            if (_hotkeyContainer == null) return;
+
+            if (_settings.AdvancedMode) {
+                _hotkeyContainer.Child = CreateRaycastNumericInput(
+                    _settings.Hotkey,
+                    "",
+                    delegate(string val, TextBox box) {
+                        string clean = (val ?? "").Trim();
+                        uint mod, vk;
+                        if (!string.IsNullOrEmpty(clean) && NativeMethods.ParseHotkey(clean, out mod, out vk)) {
+                            _settings.Hotkey = clean.ToUpperInvariant();
+                            _settings.Save();
+                            UpdateHeroTitle();
+                            RegisterGlobalHotkey();
+                        }
+                        box.Text = _settings.Hotkey;
+                    },
+                    150,
+                    _L.CustomHotkeyHint
+                );
+            } else {
+                UpdatePillGroup(_hotkeyButtons, _settings.Hotkey);
+                _hotkeyContainer.Child = _hotkeyPillsStack;
+            }
+        }
+
+        private void UpdateAudioSettingsControls() {
+            if (_sysVolContainer == null || _micVolContainer == null) return;
+
+            if (_settings.AdvancedMode) {
+                _sysVolContainer.Child = CreateRaycastNumericInput(
+                    _settings.SystemVolumePercent.ToString(),
+                    "%",
+                    delegate(string val, TextBox box) {
+                        int vol;
+                        string clean = (val ?? "").ToLower().Replace("%", "").Trim();
+                        if (int.TryParse(clean, out vol)) {
+                            _settings.SystemVolumePercent = Math.Max(0, Math.Min(1000, vol));
+                            _settings.Save();
+                            _engine.UpdateAudioVolumes(_settings.SystemVolumePercent, _settings.MicVolumePercent);
+                        }
+                        box.Text = _settings.SystemVolumePercent.ToString();
+                    },
+                    120,
+                    _L.CustomVolumeHint
+                );
+
+                _micVolContainer.Child = CreateRaycastNumericInput(
+                    _settings.MicVolumePercent.ToString(),
+                    "%",
+                    delegate(string val, TextBox box) {
+                        int vol;
+                        string clean = (val ?? "").ToLower().Replace("%", "").Trim();
+                        if (int.TryParse(clean, out vol)) {
+                            _settings.MicVolumePercent = Math.Max(0, Math.Min(1000, vol));
+                            _settings.Save();
+                            _engine.UpdateAudioVolumes(_settings.SystemVolumePercent, _settings.MicVolumePercent);
+                        }
+                        box.Text = _settings.MicVolumePercent.ToString();
+                    },
+                    120,
+                    _L.CustomVolumeHint
+                );
+            } else {
+                if (_sysVolSlider != null && _sysVolLabel != null) {
+                    _sysVolSlider.Value = Math.Min(150, _settings.SystemVolumePercent);
+                    _sysVolLabel.Text = _settings.SystemVolumePercent + "%";
+                }
+                _sysVolContainer.Child = _sysVolBox;
+
+                if (_micVolSlider != null && _micVolLabel != null) {
+                    _micVolSlider.Value = Math.Min(150, _settings.MicVolumePercent);
+                    _micVolLabel.Text = _settings.MicVolumePercent + "%";
+                }
+                _micVolContainer.Child = _micVolBox;
             }
         }
 
@@ -2578,7 +3075,7 @@ namespace ClipFlow {
                 Font = new Font("Segoe UI Variable Text", 9.5f, System.Drawing.FontStyle.Regular)
             };
 
-            // 1. Header Banner Item (Rewind v0.1)
+            // 1. Header Banner Item (Rewind v0.2)
             var header = new ToolStripMenuItem(_L.TrayHeader) {
                 Tag = "header",
                 Enabled = false,
@@ -2633,6 +3130,11 @@ namespace ClipFlow {
             // 6. Exit
             var exitItem = new ToolStripMenuItem(_L.TrayExit, null, delegate {
                 _isExiting = true;
+                try {
+                    Microsoft.Win32.SystemEvents.SessionSwitch -= OnSessionSwitch;
+                    Microsoft.Win32.SystemEvents.PowerModeChanged -= OnPowerModeChanged;
+                    Microsoft.Win32.SystemEvents.DisplaySettingsChanged -= OnDisplaySettingsChanged;
+                } catch { }
                 _engine.Stop();
                 _notifyIcon.Visible = false;
                 _notifyIcon.Dispose();
@@ -2682,6 +3184,12 @@ namespace ClipFlow {
             RegisterGlobalHotkey();
             RefreshClipsList();
 
+            try {
+                Microsoft.Win32.SystemEvents.SessionSwitch += OnSessionSwitch;
+                Microsoft.Win32.SystemEvents.PowerModeChanged += OnPowerModeChanged;
+                Microsoft.Win32.SystemEvents.DisplaySettingsChanged += OnDisplaySettingsChanged;
+            } catch { }
+
             if (_settings.BufferActive) {
                 _engine.Start();
             }
@@ -2705,10 +3213,27 @@ namespace ClipFlow {
         private void RegisterGlobalHotkey() {
             if (_hwnd == IntPtr.Zero) return;
             NativeMethods.UnregisterHotKey(_hwnd, NativeMethods.HOTKEY_ID);
+            NativeMethods.UnregisterHotKey(_hwnd, NativeMethods.HOTKEY_SECONDARY_ID);
 
             uint mod, vk;
-            NativeMethods.ParseHotkey(_settings.Hotkey, out mod, out vk);
-            NativeMethods.RegisterHotKey(_hwnd, NativeMethods.HOTKEY_ID, mod, vk);
+            if (NativeMethods.ParseHotkey(_settings.Hotkey, out mod, out vk)) {
+                bool regOk = NativeMethods.RegisterHotKey(_hwnd, NativeMethods.HOTKEY_ID, mod, vk);
+                if (!regOk && _notifyIcon != null) {
+                    _notifyIcon.ShowBalloonTip(
+                        3500,
+                        "Rewind - Skrót klawiszowy",
+                        string.Format("Nie udało się zarejestrować skrótu {0}. Może być zajęty przez inną aplikację.", _settings.Hotkey),
+                        ToolTipIcon.Warning
+                    );
+                }
+            }
+
+            if (_settings.SecondaryHotkeyEnabled && !string.IsNullOrEmpty(_settings.SecondaryHotkey)) {
+                uint mod2, vk2;
+                if (NativeMethods.ParseHotkey(_settings.SecondaryHotkey, out mod2, out vk2)) {
+                    NativeMethods.RegisterHotKey(_hwnd, NativeMethods.HOTKEY_SECONDARY_ID, mod2, vk2);
+                }
+            }
 
             if (_notifyIcon != null) {
                 _notifyIcon.Text = string.Format("Rewind [{0}]", _settings.Hotkey);
@@ -2716,13 +3241,42 @@ namespace ClipFlow {
         }
 
         private IntPtr HwndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) {
+            if (msg == WM_SHOWME && WM_SHOWME != 0) {
+                ShowAndActivate();
+                handled = true;
+                return IntPtr.Zero;
+            }
             if (msg == NativeMethods.WM_HOTKEY) {
-                if (wParam.ToInt32() == NativeMethods.HOTKEY_ID) {
-                    _engine.SaveClip();
+                int id = wParam.ToInt32();
+                if (id == NativeMethods.HOTKEY_ID) {
+                    _engine.SaveClip(_settings.ClipDuration);
+                    handled = true;
+                } else if (id == NativeMethods.HOTKEY_SECONDARY_ID) {
+                    _engine.SaveClip(_settings.SecondaryClipDuration);
                     handled = true;
                 }
             }
             return IntPtr.Zero;
+        }
+
+        private void OnSessionSwitch(object sender, Microsoft.Win32.SessionSwitchEventArgs e) {
+            if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionLock) {
+                _engine.OnSessionLock();
+            } else if (e.Reason == Microsoft.Win32.SessionSwitchReason.SessionUnlock) {
+                _engine.OnSessionUnlock();
+            }
+        }
+
+        private void OnPowerModeChanged(object sender, Microsoft.Win32.PowerModeChangedEventArgs e) {
+            if (e.Mode == Microsoft.Win32.PowerModes.Suspend) {
+                _engine.OnSessionLock();
+            } else if (e.Mode == Microsoft.Win32.PowerModes.Resume) {
+                _engine.OnSessionUnlock();
+            }
+        }
+
+        private void OnDisplaySettingsChanged(object sender, EventArgs e) {
+            _engine.OnDisplayChanged();
         }
 
         private void OnWindowClosing(object sender, System.ComponentModel.CancelEventArgs e) {
@@ -2744,9 +3298,33 @@ namespace ClipFlow {
             if (e.Key == Key.Escape) {
                 Hide();
                 e.Handled = true;
-            } else if (e.Key == Key.F8 && _settings.Hotkey == "F8") {
-                _engine.SaveClip();
-                e.Handled = true;
+            } else {
+                Key actualKey = (e.Key == Key.System ? e.SystemKey : e.Key);
+                uint currentVk = (uint)KeyInterop.VirtualKeyFromKey(actualKey);
+                uint currentMod = NativeMethods.MOD_NONE;
+                if ((Keyboard.Modifiers & ModifierKeys.Alt) != 0) currentMod |= NativeMethods.MOD_ALT;
+                if ((Keyboard.Modifiers & ModifierKeys.Control) != 0) currentMod |= NativeMethods.MOD_CONTROL;
+                if ((Keyboard.Modifiers & ModifierKeys.Shift) != 0) currentMod |= NativeMethods.MOD_SHIFT;
+                if ((Keyboard.Modifiers & ModifierKeys.Windows) != 0) currentMod |= NativeMethods.MOD_WIN;
+
+                uint mod, vk;
+                if (NativeMethods.ParseHotkey(_settings.Hotkey, out mod, out vk)) {
+                    if (currentVk == vk && currentMod == mod) {
+                        _engine.SaveClip(_settings.ClipDuration);
+                        e.Handled = true;
+                        return;
+                    }
+                }
+
+                if (_settings.SecondaryHotkeyEnabled && !string.IsNullOrEmpty(_settings.SecondaryHotkey)) {
+                    if (NativeMethods.ParseHotkey(_settings.SecondaryHotkey, out mod, out vk)) {
+                        if (currentVk == vk && currentMod == mod) {
+                            _engine.SaveClip(_settings.SecondaryClipDuration);
+                            e.Handled = true;
+                            return;
+                        }
+                    }
+                }
             }
         }
 
@@ -2756,7 +3334,7 @@ namespace ClipFlow {
                     if (recording) {
                         _sidebarStatusDot.Fill = new SolidColorBrush(Color.FromRgb(16, 185, 129));
                         _sidebarStatusText.Text = _L.SidebarStatusActive;
-                        _sidebarStatusText.Foreground = new SolidColorBrush(Color.FromRgb(209, 250, 229));
+                        _sidebarStatusText.Foreground = _theme.IsDark ? new SolidColorBrush(Color.FromRgb(209, 250, 229)) : new SolidColorBrush(Color.FromRgb(16, 120, 60));
                         if (_toggleBufferBtn != null) _toggleBufferBtn.Content = _L.TrayPauseBuffer;
                         if (_trayBufferToggleItem != null) _trayBufferToggleItem.Text = _L.TrayPauseBuffer;
                         if (_trayStatusItem != null) {
@@ -2766,7 +3344,7 @@ namespace ClipFlow {
                     } else {
                         _sidebarStatusDot.Fill = new SolidColorBrush(Color.FromRgb(245, 158, 11));
                         _sidebarStatusText.Text = _L.SidebarStatusPaused;
-                        _sidebarStatusText.Foreground = new SolidColorBrush(Color.FromRgb(254, 243, 199));
+                        _sidebarStatusText.Foreground = _theme.IsDark ? new SolidColorBrush(Color.FromRgb(254, 243, 199)) : new SolidColorBrush(Color.FromRgb(180, 83, 9));
                         if (_toggleBufferBtn != null) _toggleBufferBtn.Content = _L.TrayResumeBuffer;
                         if (_trayBufferToggleItem != null) _trayBufferToggleItem.Text = _L.TrayResumeBuffer;
                         if (_trayStatusItem != null) {
@@ -2777,13 +3355,36 @@ namespace ClipFlow {
                 }));
             };
 
+            _engine.ClipSaving += delegate(int dur) {
+                Dispatcher.Invoke(new Action(delegate {
+                    if (_heroClipBtn != null) {
+                        _heroClipBtn.IsEnabled = false;
+                        var border = _heroClipBtn.Content as Border;
+                        if (border != null) {
+                            var tb = border.Child as TextBlock;
+                            if (tb != null) {
+                                tb.Text = "⏳  Zapisywanie powtórki...";
+                            }
+                        }
+                    }
+                    _toastText.Text = "⚡  Przechwytywanie powtórki (" + dur + "s)...";
+                    _toastOpenBtn.Visibility = Visibility.Collapsed;
+                    _toastBanner.Visibility = Visibility.Visible;
+                }));
+            };
+
             _engine.ClipSaved += delegate(string path, int duration) {
                 Dispatcher.Invoke(new Action(delegate {
+                    if (_heroClipBtn != null) {
+                        _heroClipBtn.IsEnabled = true;
+                        UpdateHeroTitle();
+                    }
                     _lastSavedClipPath = path;
                     RefreshClipsList();
 
                     string fileName = Path.GetFileName(path);
                     _toastText.Text = string.Format("🎬 {0}: {1} ({2}s)", _L.ClipsTitle, fileName, duration);
+                    _toastOpenBtn.Visibility = Visibility.Visible;
                     _toastBanner.Visibility = Visibility.Visible;
 
                     if (_settings.ShowNotification) {
@@ -2803,6 +3404,11 @@ namespace ClipFlow {
 
             _engine.ErrorOccurred += delegate(string error) {
                 Dispatcher.Invoke(new Action(delegate {
+                    if (_heroClipBtn != null) {
+                        _heroClipBtn.IsEnabled = true;
+                        UpdateHeroTitle();
+                    }
+                    _toastBanner.Visibility = Visibility.Collapsed;
                     if (_notifyIcon != null) {
                         _notifyIcon.ShowBalloonTip(3000, "Rewind Info", error, ToolTipIcon.Warning);
                     }
@@ -2942,6 +3548,24 @@ namespace ClipFlow {
             };
             actionStack.Children.Add(revealBtn);
 
+            var trimBtn = new Button {
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Background = _theme.ButtonBg,
+                BorderBrush = _theme.ButtonBorder,
+                BorderThickness = new Thickness(1),
+                Foreground = _theme.TextPrimary,
+                FontSize = 11.5,
+                FontWeight = FontWeights.Medium,
+                Padding = new Thickness(12, 5, 12, 5),
+                Margin = new Thickness(0, 0, 6, 0),
+                Content = _L.ClipsTrimBtn
+            };
+            StyleModernButton(trimBtn, 10);
+            trimBtn.Click += delegate {
+                ShowTrimDialog(file.FullName);
+            };
+            actionStack.Children.Add(trimBtn);
+
             var delBtn = new Button {
                 Cursor = System.Windows.Input.Cursors.Hand,
                 Background = System.Windows.Media.Brushes.Transparent,
@@ -2966,7 +3590,203 @@ namespace ClipFlow {
             grid.Children.Add(actionStack);
 
             card.Child = grid;
+
+            // Double click opens clip in default player; Delete key deletes
+            card.Focusable = true;
+            card.Cursor = System.Windows.Input.Cursors.Hand;
+            card.MouseLeftButtonDown += delegate(object sender, System.Windows.Input.MouseButtonEventArgs e) {
+                if (e.ClickCount == 2) {
+                    try { Process.Start(new ProcessStartInfo(file.FullName) { UseShellExecute = true }); } catch { }
+                }
+            };
+            card.KeyDown += delegate(object sender, System.Windows.Input.KeyEventArgs e) {
+                if (e.Key == System.Windows.Input.Key.Delete) {
+                    delBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+                }
+            };
+
             return card;
+        }
+
+        private void ShowTrimDialog(string filePath) {
+            try {
+                var dlg = new Window {
+                    Title = _L.TrimDialogTitle,
+                    Width = 440,
+                    Height = 250,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Owner = this,
+                    ResizeMode = ResizeMode.NoResize,
+                    WindowStyle = WindowStyle.None,
+                    AllowsTransparency = true,
+                    Background = System.Windows.Media.Brushes.Transparent,
+                    ShowInTaskbar = false
+                };
+
+                var border = new Border {
+                    Background = _theme.CardBg,
+                    BorderBrush = _theme.CardBorder,
+                    BorderThickness = new Thickness(1.5),
+                    CornerRadius = new CornerRadius(14),
+                    Padding = new Thickness(22)
+                };
+
+                var root = new StackPanel { Orientation = Orientation.Vertical };
+
+                // Header
+                var headerGrid = new Grid { Margin = new Thickness(0, 0, 0, 16) };
+                headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var titleStack = new StackPanel();
+                titleStack.Children.Add(new TextBlock {
+                    Text = _L.TrimDialogTitle,
+                    FontSize = 15,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = _theme.TextPrimary
+                });
+                titleStack.Children.Add(new TextBlock {
+                    Text = Path.GetFileName(filePath),
+                    FontSize = 11,
+                    Foreground = _theme.TextSecondary,
+                    Margin = new Thickness(0, 3, 0, 0),
+                    TextTrimming = TextTrimming.CharacterEllipsis
+                });
+                Grid.SetColumn(titleStack, 0);
+                headerGrid.Children.Add(titleStack);
+
+                var closeBtn = new Button {
+                    Cursor = System.Windows.Input.Cursors.Hand,
+                    Background = System.Windows.Media.Brushes.Transparent,
+                    BorderThickness = new Thickness(0),
+                    Foreground = _theme.TextSecondary,
+                    FontSize = 13,
+                    Content = "✕",
+                    Padding = new Thickness(6, 2, 6, 2)
+                };
+                StyleModernButton(closeBtn, 6);
+                closeBtn.Click += delegate { dlg.Close(); };
+                Grid.SetColumn(closeBtn, 1);
+                headerGrid.Children.Add(closeBtn);
+                root.Children.Add(headerGrid);
+
+                // Inputs row
+                var inputsGrid = new Grid { Margin = new Thickness(0, 0, 0, 18) };
+                inputsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                inputsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(16) });
+                inputsGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                // Start sec
+                var startStack = new StackPanel();
+                startStack.Children.Add(new TextBlock {
+                    Text = _L.TrimStartLabel,
+                    FontSize = 12,
+                    Foreground = _theme.TextSecondary,
+                    Margin = new Thickness(0, 0, 0, 6)
+                });
+                var startBox = new TextBox {
+                    Text = "0",
+                    FontSize = 13,
+                    Padding = new Thickness(8, 6, 8, 6),
+                    Background = _theme.InputBg,
+                    Foreground = _theme.TextPrimary,
+                    BorderBrush = _theme.InputBorder,
+                    BorderThickness = new Thickness(1)
+                };
+                startStack.Children.Add(startBox);
+                Grid.SetColumn(startStack, 0);
+                inputsGrid.Children.Add(startStack);
+
+                // End sec
+                var endStack = new StackPanel();
+                endStack.Children.Add(new TextBlock {
+                    Text = _L.TrimEndLabel,
+                    FontSize = 12,
+                    Foreground = _theme.TextSecondary,
+                    Margin = new Thickness(0, 0, 0, 6)
+                });
+                var endBox = new TextBox {
+                    Text = "15",
+                    FontSize = 13,
+                    Padding = new Thickness(8, 6, 8, 6),
+                    Background = _theme.InputBg,
+                    Foreground = _theme.TextPrimary,
+                    BorderBrush = _theme.InputBorder,
+                    BorderThickness = new Thickness(1)
+                };
+                endStack.Children.Add(endBox);
+                Grid.SetColumn(endStack, 2);
+                inputsGrid.Children.Add(endStack);
+
+                root.Children.Add(inputsGrid);
+
+                // Action buttons
+                var btnGrid = new Grid();
+                btnGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                btnGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                var cancelBtn = new Button {
+                    Cursor = System.Windows.Input.Cursors.Hand,
+                    Background = _theme.ButtonBg,
+                    BorderBrush = _theme.ButtonBorder,
+                    BorderThickness = new Thickness(1),
+                    Foreground = _theme.TextSecondary,
+                    FontSize = 12,
+                    Padding = new Thickness(14, 6, 14, 6),
+                    Margin = new Thickness(0, 0, 10, 0),
+                    Content = _L.TrimCancelBtn
+                };
+                StyleModernButton(cancelBtn, 8);
+                cancelBtn.Click += delegate { dlg.Close(); };
+
+                var saveBtn = new Button {
+                    Cursor = System.Windows.Input.Cursors.Hand,
+                    Background = _theme.AccentCoral,
+                    BorderThickness = new Thickness(0),
+                    Foreground = System.Windows.Media.Brushes.White,
+                    FontSize = 12,
+                    FontWeight = FontWeights.SemiBold,
+                    Padding = new Thickness(16, 6, 16, 6),
+                    Content = _L.TrimSaveBtn
+                };
+                StyleModernButton(saveBtn, 8);
+                saveBtn.Click += delegate {
+                    double startSec = 0;
+                    double endSec = 0;
+                    if (!double.TryParse(startBox.Text.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out startSec) || startSec < 0) {
+                        MessageBox.Show(_L.TrimInvalidStart, "Rewind", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    if (!double.TryParse(endBox.Text.Replace(',', '.'), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out endSec) || endSec <= startSec) {
+                        MessageBox.Show(_L.TrimInvalidEnd, "Rewind", MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+
+                    string outPath;
+                    bool ok = _engine.TrimClip(filePath, startSec, endSec, out outPath);
+                    if (ok) {
+                        dlg.Close();
+                        RefreshClipsList();
+                        _lastSavedClipPath = outPath;
+                        _toastText.Text = "✂️ " + _L.TrimSuccess + ": " + Path.GetFileName(outPath);
+                        _toastBanner.Visibility = Visibility.Visible;
+                    } else {
+                        MessageBox.Show(_L.TrimError, "Rewind", MessageBoxButton.OK, MessageBoxImage.Error);
+                    }
+                };
+
+                var btnsStack = new StackPanel { Orientation = Orientation.Horizontal };
+                btnsStack.Children.Add(cancelBtn);
+                btnsStack.Children.Add(saveBtn);
+                Grid.SetColumn(btnsStack, 1);
+                btnGrid.Children.Add(btnsStack);
+
+                root.Children.Add(btnGrid);
+                border.Child = root;
+                dlg.Content = border;
+                dlg.ShowDialog();
+            } catch {
+            }
         }
 
         private void OpenClipsFolder() {

@@ -96,7 +96,7 @@ It runs silently in your system tray, capturing the exact gameplay moments you w
 ## 🚀 Download & Installation
 
 ### Windows:
-1. Download **`RewindSetup.exe`** (Installer) or **`Rewind.exe`** (Standalone Portable) from [Releases](https://github.com/qavi999/Rewind/releases).
+1. Download **`RewindSetup.exe`** from [Releases](https://github.com/qavi999/Rewind/releases).
 2. Choose your language, select installation options, and click **Install**.
 3. Press `F8` (or your configured hotkey) in any game or desktop to capture your clip instantly.
 

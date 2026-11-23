@@ -47,9 +47,5 @@
 
 | Asset | Platform | Description |
 |---|---|---|
-| **`RewindSetup.exe`** | Windows 10/11 | Dedicated Windows installer with Start Menu, desktop shortcuts, and autostart support. |
-| **`Rewind.exe`** | Windows 10/11 | Standalone portable executable. Zero installation required. |
-| **`Rewind-v0.2-Linux.tar.gz`** | Linux (x86_64) | Complete Linux release tarball with automated installer, launcher, and daemon. |
-| **`rewind-linux`** | Linux (x86_64) | Standalone Linux executable binary. |
-| **`install.sh` / `uninstall.sh`** | Linux | Scripts for system-wide or user-level installation and removal. |
-| **`rewind.desktop`** | Linux | XDG Desktop Entry specification file. |
+| **`RewindSetup.exe`** | Windows 10/11 | Official Windows installer (Start Menu, desktop shortcuts, Windows Search indexing, tray autostart). |
+| **`Rewind-v0.2-Linux.tar.gz`** | Linux (x86_64) | Complete Linux release package (includes automated `install.sh`, binary, icon, and desktop launcher). |

@@ -157,9 +157,36 @@ namespace ClipFlow {
             }
         }
 
+        private void KillStaleFfmpegProcesses() {
+            try {
+                foreach (var p in Process.GetProcessesByName("ffmpeg")) {
+                    try {
+                        if (_ffmpegProcess != null && p.Id == _ffmpegProcess.Id) continue;
+                        bool isOurs = false;
+                        try {
+                            string path = p.MainModule != null ? p.MainModule.FileName : "";
+                            if (!string.IsNullOrEmpty(path)) {
+                                if (path.IndexOf("Rewind", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    path.IndexOf("clipowanie", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    path.IndexOf("Flashback", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                                    path.IndexOf("ClipFlow", StringComparison.OrdinalIgnoreCase) >= 0) {
+                                    isOurs = true;
+                                }
+                            }
+                        } catch { }
+
+                        if (isOurs) {
+                            p.Kill();
+                        }
+                    } catch { }
+                }
+            } catch { }
+        }
+
         public void Start() {
             lock (_lock) {
                 if (_isRecording || _isSessionLocked) return;
+                KillStaleFfmpegProcesses();
                 CleanBufferDir();
 
                 string ffmpegPath = FindOrExtractFfmpeg();
@@ -218,25 +245,47 @@ namespace ClipFlow {
 
                 string args;
 
-                if (_useDdagrab) {
+                bool useDda = _useDdagrab && !string.Equals(_settings.CaptureEngine, "GDI", StringComparison.OrdinalIgnoreCase);
+
+                if (useDda) {
                     int monitorIndex = 0;
+                    string targetDeviceName = null;
                     try {
                         var screens = Screen.AllScreens;
                         if (screens != null && screens.Length > 0) {
+                            Screen targetScreen = null;
                             if (!string.IsNullOrEmpty(_settings.SelectedDisplayDevice)) {
                                 for (int i = 0; i < screens.Length; i++) {
                                     if (string.Equals(screens[i].DeviceName, _settings.SelectedDisplayDevice, StringComparison.OrdinalIgnoreCase)) {
                                         monitorIndex = i;
+                                        targetScreen = screens[i];
                                         break;
                                     }
                                 }
                             } else if (_settings.SelectedDisplayIndex >= 0 && _settings.SelectedDisplayIndex < screens.Length) {
                                 monitorIndex = _settings.SelectedDisplayIndex;
+                                targetScreen = screens[monitorIndex];
+                            }
+                            if (targetScreen == null) {
+                                targetScreen = screens.FirstOrDefault(s => s.Primary) ?? screens[0];
+                            }
+                            if (targetScreen != null) {
+                                targetDeviceName = targetScreen.DeviceName;
                             }
                         }
                     } catch { }
 
-                    string ddaFilter = string.Format("ddagrab=framerate={0}:output_idx={1}:draw_mouse={2}", fps, monitorIndex, drawMouse);
+                    // Query native hardware monitor refresh rate (e.g. 144Hz, 165Hz, 240Hz)
+                    int nativeHz = NativeMethods.GetMonitorRefreshRate(targetDeviceName);
+                    if (nativeHz < 30) nativeHz = 60;
+
+                    // Match Desktop Duplication polling to native Hz so G-Sync/DWM never drops monitor Hz!
+                    int captureRate = Math.Max(nativeHz, fps);
+
+                    string ddaFilter = string.Format("ddagrab=framerate={0}:output_idx={1}:draw_mouse={2}", captureRate, monitorIndex, drawMouse);
+                    if (captureRate > fps) {
+                        ddaFilter += string.Format(",fps={0}", fps);
+                    }
                     string encoderParams;
 
                     if (_activeEncoder == "h264_nvenc") {
@@ -339,6 +388,7 @@ namespace ClipFlow {
                     _ffmpegProcess.Exited += OnProcessExited;
                     _recordStartTime = DateTime.UtcNow;
                     _ffmpegProcess.Start();
+                    ChildProcessTracker.AddProcess(_ffmpegProcess);
                     _ffmpegProcess.BeginErrorReadLine();
 
                     try {

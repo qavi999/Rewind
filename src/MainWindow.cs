@@ -501,6 +501,8 @@ namespace ClipFlow {
         private List<Button> _durationButtons = new List<Button>();
         private List<Button> _fpsButtons = new List<Button>();
         private List<Button> _bitrateButtons = new List<Button>();
+        private StackPanel _enginePillsStack;
+        private List<Button> _engineButtons = new List<Button>();
         private TextBlock _folderPathText;
 
         // Audio Settings Controls
@@ -1533,6 +1535,37 @@ namespace ClipFlow {
                 _L.VideoScreenTitle,
                 _L.VideoScreenSub,
                 screenSelector
+            ));
+            cardStack.Children.Add(CreateRowDivider());
+
+            // Silnik przechwytywania (DirectX DDA vs GDI Grab)
+            _enginePillsStack = new StackPanel { Orientation = Orientation.Horizontal };
+            _engineButtons.Clear();
+
+            var ddaBtn = CreateSegmentButton(_L.VideoEngineDda, _settings.CaptureEngine != "GDI");
+            ddaBtn.Click += delegate {
+                _settings.CaptureEngine = "DirectX";
+                _settings.Save();
+                UpdatePillGroup(_engineButtons, _L.VideoEngineDda);
+                RestartBufferWithNewSettings();
+            };
+            _engineButtons.Add(ddaBtn);
+            _enginePillsStack.Children.Add(ddaBtn);
+
+            var gdiBtn = CreateSegmentButton(_L.VideoEngineGdi, _settings.CaptureEngine == "GDI");
+            gdiBtn.Click += delegate {
+                _settings.CaptureEngine = "GDI";
+                _settings.Save();
+                UpdatePillGroup(_engineButtons, _L.VideoEngineGdi);
+                RestartBufferWithNewSettings();
+            };
+            _engineButtons.Add(gdiBtn);
+            _enginePillsStack.Children.Add(gdiBtn);
+
+            cardStack.Children.Add(CreateRaycastSettingsRow(
+                _L.VideoEngineTitle,
+                _L.VideoEngineSub,
+                _enginePillsStack
             ));
             cardStack.Children.Add(CreateRowDivider());
 

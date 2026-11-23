@@ -49,6 +49,10 @@ namespace ClipFlow {
         public string VideoFolderTitle { get; set; }
         public string VideoFolderSub { get; set; }
         public string VideoFolderBtn { get; set; }
+        public string VideoEngineTitle { get; set; }
+        public string VideoEngineSub { get; set; }
+        public string VideoEngineDda { get; set; }
+        public string VideoEngineGdi { get; set; }
 
         public string AdvancedModeTitle { get; set; }
         public string AdvancedModeSub { get; set; }
@@ -232,6 +236,10 @@ namespace ClipFlow {
                 VideoFolderTitle = "Folder zapisu powtórek",
                 VideoFolderSub = "Katalog, w którym zapisywane są gotowe pliki MP4.",
                 VideoFolderBtn = "Zmień folder...",
+                VideoEngineTitle = "Silnik przechwytywania ekranu",
+                VideoEngineSub = "DirectX DDA (akceleracja GPU z synchronizacją Hz) lub GDI Grab (zgodność z G-Sync)",
+                VideoEngineDda = "DirectX DDA",
+                VideoEngineGdi = "GDI Grab",
 
                 AdvancedModeTitle = "Odblokuj ustawienia zaawansowane",
                 AdvancedModeSub = "Zamienia suwaki i sztywne przyciski na pola tekstowe, w których możesz wpisać dowolne wartości FPS, bufora, bitrate oraz głośności.",
@@ -402,6 +410,10 @@ namespace ClipFlow {
                 VideoFolderTitle = "Clips destination folder",
                 VideoFolderSub = "Directory where MP4 video replays are stored.",
                 VideoFolderBtn = "Change Folder...",
+                VideoEngineTitle = "Screen Capture Engine",
+                VideoEngineSub = "DirectX DDA (GPU accelerated with native Hz sync) or GDI Grab (G-Sync safe)",
+                VideoEngineDda = "DirectX DDA",
+                VideoEngineGdi = "GDI Grab",
 
                 AdvancedModeTitle = "Unlock Advanced Settings",
                 AdvancedModeSub = "Replaces fixed buttons and sliders with custom text fields for arbitrary FPS, buffer duration, bitrate, and audio volume.",
@@ -572,6 +584,10 @@ namespace ClipFlow {
                 VideoFolderTitle = "Speicherordner für Clips",
                 VideoFolderSub = "Verzeichnis für MP4-Videodateien.",
                 VideoFolderBtn = "Ordner ändern...",
+                VideoEngineTitle = "Bildschirmaufnahme-Engine",
+                VideoEngineSub = "DirectX DDA (GPU-beschleunigt mit Hz-Synchronisation) oder GDI Grab",
+                VideoEngineDda = "DirectX DDA",
+                VideoEngineGdi = "GDI Grab",
 
                 AdvancedModeTitle = "Erweiterte Einstellungen freischalten",
                 AdvancedModeSub = "Ersetzt feste Tasten und Schieberegler durch Textfelder für beliebige FPS-, Puffer-, Bitrate- und Lautstärkewerte.",
@@ -740,6 +756,10 @@ namespace ClipFlow {
                 VideoFolderTitle = "Carpeta de destino de clips",
                 VideoFolderSub = "Directorio donde se guardan los archivos MP4.",
                 VideoFolderBtn = "Cambiar carpeta...",
+                VideoEngineTitle = "Motor de captura de pantalla",
+                VideoEngineSub = "DirectX DDA (acelerado por GPU con sincronización Hz) o GDI Grab",
+                VideoEngineDda = "DirectX DDA",
+                VideoEngineGdi = "GDI Grab",
 
                 AdvancedModeTitle = "Desbloquear ajustes avanzados",
                 AdvancedModeSub = "Sustituye los botones y controles por campos de texto para escribir cualquier valor de FPS, búfer, bitrate y volumen.",
@@ -908,6 +928,10 @@ namespace ClipFlow {
                 VideoFolderTitle = "Dossier de destination",
                 VideoFolderSub = "Répertoire où sont sauvegardés les fichiers MP4.",
                 VideoFolderBtn = "Changer de dossier...",
+                VideoEngineTitle = "Moteur de capture d'écran",
+                VideoEngineSub = "DirectX DDA (accélération GPU avec synchronisation Hz) ou GDI Grab",
+                VideoEngineDda = "DirectX DDA",
+                VideoEngineGdi = "GDI Grab",
 
                 AdvancedModeTitle = "Déverrouiller les paramètres avancés",
                 AdvancedModeSub = "Remplace les sélecteurs fixes par des champs de texte pour saisir n'importe quel FPS, durée, débit et volume.",
@@ -1076,6 +1100,10 @@ namespace ClipFlow {
                 VideoFolderTitle = "Папка для збереження кліпів",
                 VideoFolderSub = "Каталог, куди зберігаються готові MP4 файли.",
                 VideoFolderBtn = "Змінити папку...",
+                VideoEngineTitle = "Рушій запису екрана",
+                VideoEngineSub = "DirectX DDA (апаратне прискорення з авто-Гц) або GDI Grab",
+                VideoEngineDda = "DirectX DDA",
+                VideoEngineGdi = "GDI Grab",
 
                 AdvancedModeTitle = "Розблокувати розширені налаштування",
                 AdvancedModeSub = "Замінює кнопки та повзунки на текстові поля, де можна ввести довільні значення FPS, буфера, бітрейту та гучності.",

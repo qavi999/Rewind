@@ -84,8 +84,10 @@ namespace ClipFlow {
         public bool StorageLimitEnabled { get; set; }
         public int MaxStorageLimitGB { get; set; }
         public int MaxClipAgeDays { get; set; }
+        public string CaptureEngine { get; set; }
 
         public AppSettings() {
+            CaptureEngine = "DirectX";
             Language = "pl";
             AdvancedMode = false;
             SeparateAudioTracks = false;

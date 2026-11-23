@@ -765,15 +765,55 @@ def send_ipc_command(cmd):
 
 
 def start_x11_hotkey_listener(engine):
-    """Listen for global hotkeys on X11 root window via XGrabKey."""
+    """Listen for global hotkeys on X11 root window via XGrabKey with 64-bit ctypes safety."""
     def _worker():
         try:
+            if not os.environ.get("DISPLAY"):
+                return
+
             x11 = ctypes.cdll.LoadLibrary("libX11.so.6")
+
+            # Thread safety for multi-threaded X11 calls
+            try:
+                x11.XInitThreads.restype = ctypes.c_int
+                x11.XInitThreads.argtypes = []
+                x11.XInitThreads()
+            except Exception:
+                pass
+
+            # Define 64-bit pointer and type signatures to prevent SIGSEGV truncation
+            x11.XOpenDisplay.restype = ctypes.c_void_p
+            x11.XOpenDisplay.argtypes = [ctypes.c_char_p]
+
+            x11.XDefaultRootWindow.restype = ctypes.c_ulong
+            x11.XDefaultRootWindow.argtypes = [ctypes.c_void_p]
+
+            x11.XKeysymToKeycode.restype = ctypes.c_uint
+            x11.XKeysymToKeycode.argtypes = [ctypes.c_void_p, ctypes.c_ulong]
+
+            x11.XGrabKey.restype = ctypes.c_int
+            x11.XGrabKey.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_uint, ctypes.c_ulong, ctypes.c_int, ctypes.c_int, ctypes.c_int]
+
+            x11.XSelectInput.restype = ctypes.c_int
+            x11.XSelectInput.argtypes = [ctypes.c_void_p, ctypes.c_ulong, ctypes.c_long]
+
+            x11.XNextEvent.restype = ctypes.c_int
+            x11.XNextEvent.argtypes = [ctypes.c_void_p, ctypes.c_void_p]
+
+            x11.XCloseDisplay.restype = ctypes.c_int
+            x11.XCloseDisplay.argtypes = [ctypes.c_void_p]
+
             display = x11.XOpenDisplay(None)
             if not display:
                 return
 
             root = x11.XDefaultRootWindow(display)
+            if not root:
+                try:
+                    x11.XCloseDisplay(display)
+                except Exception:
+                    pass
+                return
 
             # Map hotkey to keysym
             key_map = {

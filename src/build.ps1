@@ -126,12 +126,25 @@ if ($LASTEXITCODE -eq 0 -and (Test-Path "$buildDir\Rewind.exe")) {
         $standaloneBin = Join-Path $buildDir "rewind-linux"
         [System.IO.File]::WriteAllText($standaloneBin, $rewindContent, (New-Object System.Text.UTF8Encoding($false)))
 
+        # Build standalone windowed installer (RewindSetup)
+        $installerPy = Join-Path $srcLinux "installer.py"
+        $standaloneInstaller = Join-Path $buildDir "RewindSetup"
+        if (Test-Path $installerPy) {
+            $installerContent = [System.IO.File]::ReadAllText($installerPy, [System.Text.Encoding]::UTF8)
+            if ($installerContent.Contains("from assets_b64 import")) {
+                $installerContent = $installerContent -replace 'try:\s+from assets_b64 import[^\n]+\nexcept ImportError:\s+LOGO_PNG_B64 = ""', $assetsContent
+            }
+            $installerContent = $installerContent.Replace("`r`n", "`n")
+            [System.IO.File]::WriteAllText($standaloneInstaller, $installerContent, (New-Object System.Text.UTF8Encoding($false)))
+            Copy-Item $installerPy (Join-Path $buildDir "installer.py") -Force
+        }
+
         Copy-Item (Join-Path $srcLinux "install.sh") (Join-Path $buildDir "install.sh") -Force
         Copy-Item (Join-Path $srcLinux "uninstall.sh") (Join-Path $buildDir "uninstall.sh") -Force
         Copy-Item (Join-Path $srcLinux "rewind.desktop") (Join-Path $buildDir "rewind.desktop") -Force
 
         # Ensure shell scripts have LF line endings
-        foreach ($fName in @("install.sh", "uninstall.sh", "rewind.desktop")) {
+        foreach ($fName in @("install.sh", "uninstall.sh", "rewind.desktop", "RewindSetup", "installer.py")) {
             $fPath = Join-Path $buildDir $fName
             if (Test-Path $fPath) {
                 $txt = [System.IO.File]::ReadAllText($fPath).Replace("`r`n", "`n")
@@ -146,15 +159,20 @@ if ($LASTEXITCODE -eq 0 -and (Test-Path "$buildDir\Rewind.exe")) {
         New-Item -ItemType Directory -Path $subPackDir -Force | Out-Null
 
         Copy-Item $standaloneBin (Join-Path $subPackDir "rewind-linux") -Force
+        if (Test-Path $standaloneInstaller) {
+            Copy-Item $standaloneInstaller (Join-Path $subPackDir "RewindSetup") -Force
+            Copy-Item $installerPy (Join-Path $subPackDir "installer.py") -Force
+        }
         Copy-Item (Join-Path $srcLinux "install.sh") (Join-Path $subPackDir "install.sh") -Force
         Copy-Item (Join-Path $srcLinux "uninstall.sh") (Join-Path $subPackDir "uninstall.sh") -Force
         Copy-Item (Join-Path $srcLinux "rewind.desktop") (Join-Path $subPackDir "rewind.desktop") -Force
         Copy-Item (Join-Path $srcLinux "README.md") (Join-Path $subPackDir "README.md") -Force
         if (Test-Path $logoPng) {
             Copy-Item $logoPng (Join-Path $subPackDir "icon.png") -Force
+            Copy-Item $logoPng (Join-Path $buildDir "icon.png") -Force
         }
 
-        foreach ($fName in @("install.sh", "uninstall.sh", "rewind.desktop", "rewind-linux")) {
+        foreach ($fName in @("install.sh", "uninstall.sh", "rewind.desktop", "rewind-linux", "RewindSetup", "installer.py")) {
             $fPath = Join-Path $subPackDir $fName
             if (Test-Path $fPath) {
                 $txt = [System.IO.File]::ReadAllText($fPath).Replace("`r`n", "`n")
@@ -177,7 +195,7 @@ if ($LASTEXITCODE -eq 0 -and (Test-Path "$buildDir\Rewind.exe")) {
     }
 
     # Clean any stale files from build directory
-    $validFiles = @("Rewind.exe", "RewindSetup.exe", "rewind-linux", "install.sh", "uninstall.sh", "rewind.desktop", "Rewind-$Release-Linux.tar.gz")
+    $validFiles = @("Rewind.exe", "RewindSetup.exe", "rewind-linux", "RewindSetup", "installer.py", "install.sh", "uninstall.sh", "rewind.desktop", "icon.png", "Rewind-$Release-Linux.tar.gz")
     Get-ChildItem -Path $buildDir -File | Where-Object { $validFiles -notcontains $_.Name } | Remove-Item -Force -ErrorAction SilentlyContinue
 
     # Mirror to v.02 if Release is v0.2 so both folder name formats exist

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=Zainstaluj Rewind
+GenericName=Instalator Rewind
+Comment=Graficzny instalator programu Rewind dla Linux
+Exec=bash -c "cd \"$(dirname \"%k\")\" && ./install.sh"
+Icon=system-software-install
+Terminal=false
+Type=Application
+Categories=Utility;

@@ -1002,20 +1002,28 @@ def main():
     parser.add_argument("--autostart", action="store_true", help="Włącz autostart w tle")
     args = parser.parse_args()
 
-    has_display = bool(os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"))
-
-    if args.cli or not has_display:
+    # Explicit CLI request
+    if args.cli:
         if args.uninstall:
             run_cli_uninstall()
         else:
             run_cli_install(target_dir=args.target, autostart=args.autostart)
         sys.exit(0)
 
+    # Detect active display if not set in environment
+    if not os.environ.get("DISPLAY"):
+        for x_num in range(4):
+            if os.path.exists(f"/tmp/.X11-unix/X{x_num}"):
+                os.environ["DISPLAY"] = f":{x_num}"
+                break
+
+    # Always attempt windowed graphical installer first
     try:
         gui = RewindInstallerGui(is_uninstall=args.uninstall)
         gui.root.mainloop()
     except Exception as ex:
-        print(f"[RewindSetup] Nie można uruchomić interfejsu graficznego ({ex}). Przełączanie w tryb terminalowy...", file=sys.stderr)
+        print(f"[RewindSetup] Nie można uruchomić interfejsu graficznego ({ex}).", file=sys.stderr)
+        print(f"[RewindSetup] Automatyczne przełączanie w tryb terminalowy...", file=sys.stderr)
         if args.uninstall:
             run_cli_uninstall()
         else:

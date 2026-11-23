@@ -490,12 +490,18 @@ class BufferEngine:
                 seg_pattern
             ])
 
+            FFMPEG_LOG = CONFIG_DIR / "ffmpeg.log"
+            try:
+                log_file = open(FFMPEG_LOG, "w", encoding="utf-8")
+            except Exception:
+                log_file = subprocess.DEVNULL
+
             try:
                 self.process = subprocess.Popen(
                     cmd,
                     stdin=subprocess.PIPE,
                     stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
+                    stderr=log_file
                 )
                 self.record_start_time = time.time()
                 self.is_recording = True
@@ -528,6 +534,7 @@ class BufferEngine:
             self.notify_status(False, "Bufor zatrzymany")
 
     def _watchdog_loop(self):
+        fail_count = 0
         while True:
             time.sleep(2.5)
             try:
@@ -535,12 +542,21 @@ class BufferEngine:
                     if not self.settings.BufferActive or self.is_saving:
                         continue
 
-                    # Revive if dead
+                    # Revive if dead with backoff
                     if self.is_recording:
                         if self.process is None or self.process.poll() is not None:
+                            fail_count += 1
+                            if fail_count >= 4:
+                                self.is_recording = False
+                                self.notify_status(False, "Bufor zatrzymany (błąd startu FFmpeg - sprawdź ~/.config/rewind/ffmpeg.log)")
+                                time.sleep(10)
+                                fail_count = 0
+                                continue
                             self.stop()
                             self.start()
                             continue
+                        else:
+                            fail_count = 0
 
                         # Check for freeze
                         if time.time() - self.record_start_time > 8.0:
@@ -549,13 +565,6 @@ class BufferEngine:
                                 newest = max(files, key=lambda f: f.stat().st_mtime)
                                 if time.time() - newest.stat().st_mtime > 10.0:
                                     self.stop()
-                                    self.start()
-                                    continue
-
-                    # Trim ring buffer
-                    self._trim_buffer()
-            except Exception:
-                pass
                                     self.start()
                                     continue
 
@@ -1006,6 +1015,7 @@ def start_x11_hotkey_listener(engine):
 # =============================================================================
 def run_gui(settings, engine, ipc=None):
     import tkinter as tk
+    import tkinter.font as tkfont
     from tkinter import ttk, filedialog, messagebox
 
     root = tk.Tk()
@@ -1013,7 +1023,18 @@ def run_gui(settings, engine, ipc=None):
     root.geometry("960x640")
     root.minsize(880, 580)
 
-    # Register show_window handler for IPC (Showstopper #5)
+    # 1. Detect best modern antialiased sans-serif font available on this Linux distro
+    available_fams = set(tkfont.families(root))
+    FONT_FAM = "sans-serif"
+    for cand in ["Segoe UI", "Inter", "Roboto", "Ubuntu", "Cantarell", "Liberation Sans", "DejaVu Sans"]:
+        if cand in available_fams:
+            FONT_FAM = cand
+            break
+
+    def fnt(size=10, weight="normal"):
+        return (FONT_FAM, size, weight)
+
+    # Register show_window handler for IPC
     if ipc:
         def show_window():
             try:
@@ -1033,113 +1054,103 @@ def run_gui(settings, engine, ipc=None):
         except Exception:
             pass
 
-    # Styling colors
+    # Pure Jet Black / Raycast Palette matching Windows ThemePalette
     THEMES = {
         "Dark": {
-            "bg": "#0D0D11",
-            "sidebar": "#121218",
-            "card": "#181822",
-            "card_border": "#252535",
-            "text": "#F3F3F6",
-            "text_muted": "#8E8E9E",
+            "bg": "#0A0A0A",
+            "sidebar": "#0F0F0F",
+            "sidebar_border": "#1A1A1A",
+            "card": "#121214",
+            "card_border": "#1E1E24",
+            "card_hover": "#17171C",
+            "text": "#FFFFFF",
+            "text_secondary": "#9696A0",
+            "text_muted": "#646470",
             "accent": "#FF5757",
-            "pill_bg": "#22222E",
+            "accent_hover": "#FF6E6E",
+            "pill_bg": "#18181C",
+            "pill_border": "#282832",
             "pill_active": "#FF5757",
+            "pill_active_bg": "#2B161B",
+            "pill_active_fg": "#FFFFFF",
             "status_active": "#10B981",
-            "status_text": "#D1FAE5"
+            "status_active_bg": "#0B2618",
+            "status_paused": "#F59E0B"
         },
         "Light": {
-            "bg": "#F5F5F7",
-            "sidebar": "#EBECEF",
+            "bg": "#F6F7FA",
+            "sidebar": "#EDEFF4",
+            "sidebar_border": "#DCDFE6",
             "card": "#FFFFFF",
-            "card_border": "#E2E2E8",
-            "text": "#1A1A24",
-            "text_muted": "#686878",
+            "card_border": "#DEE1EA",
+            "card_hover": "#F0F2F8",
+            "text": "#121218",
+            "text_secondary": "#5C5F6C",
+            "text_muted": "#888C98",
             "accent": "#FF5757",
-            "pill_bg": "#E5E5EB",
+            "accent_hover": "#FF6E6E",
+            "pill_bg": "#EEF0F6",
+            "pill_border": "#D6DAE4",
             "pill_active": "#18181E",
+            "pill_active_bg": "#E5E5EB",
+            "pill_active_fg": "#FFFFFF",
             "status_active": "#10B981",
-            "status_text": "#065F46"
+            "status_active_bg": "#D1FAE5",
+            "status_paused": "#F59E0B"
         }
     }
 
-    current_theme = THEMES.get(settings.Theme, THEMES["Dark"])
-    root.configure(bg=current_theme["bg"])
+    C = THEMES.get(settings.Theme, THEMES["Dark"])
+    root.configure(bg=C["bg"])
 
     # Main layout Grid
-    root.columnconfigure(0, weight=0, minsize=220)
+    root.columnconfigure(0, weight=0, minsize=226)
     root.columnconfigure(1, weight=1)
     root.rowconfigure(0, weight=1)
 
     # -------------------------------------------------------------------------
-    # SIDEBAR
+    # LEFT SIDEBAR (226px, #0F0F0F)
     # -------------------------------------------------------------------------
-    sidebar = tk.Frame(root, bg=current_theme["sidebar"], width=220)
+    sidebar = tk.Frame(root, bg=C["sidebar"], width=226, highlightthickness=1, highlightbackground=C["sidebar_border"])
     sidebar.grid(row=0, column=0, sticky="nsew")
     sidebar.grid_propagate(False)
 
-    # App Title & Version
-    brand_frame = tk.Frame(sidebar, bg=current_theme["sidebar"])
-    brand_frame.pack(fill="x", padx=18, pady=(20, 15))
+    # Brand Header
+    brand_frame = tk.Frame(sidebar, bg=C["sidebar"])
+    brand_frame.pack(fill="x", padx=18, pady=(20, 16))
 
-    title_lbl = tk.Label(
-        brand_frame,
-        text="⏪ REWIND",
-        font=("Segoe UI", 15, "bold"),
-        fg=current_theme["text"],
-        bg=current_theme["sidebar"]
-    )
-    title_lbl.pack(anchor="w")
+    brand_row = tk.Frame(brand_frame, bg=C["sidebar"])
+    brand_row.pack(anchor="w")
 
-    ver_lbl = tk.Label(
-        brand_frame,
-        text=f"{APP_VERSION} Linux Edition",
-        font=("Segoe UI", 9),
-        fg=current_theme["text_muted"],
-        bg=current_theme["sidebar"]
-    )
-    ver_lbl.pack(anchor="w")
+    tk.Label(
+        brand_row,
+        text="⏪",
+        font=fnt(13, "bold"),
+        fg=C["accent"],
+        bg=C["sidebar"]
+    ).pack(side="left", padx=(0, 6))
 
-    # Status badge
-    status_frame = tk.Frame(sidebar, bg=current_theme["card"], bd=1, relief="solid")
-    status_frame.pack(fill="x", padx=16, pady=(0, 20))
+    tk.Label(
+        brand_row,
+        text="Rewind",
+        font=fnt(15, "bold"),
+        fg=C["text"],
+        bg=C["sidebar"]
+    ).pack(side="left")
 
-    status_lbl = tk.Label(
-        status_frame,
-        text="● Bufor aktywny",
-        font=("Segoe UI", 9, "bold"),
-        fg=current_theme["status_active"],
-        bg=current_theme["card"],
-        pady=5
-    )
-    status_lbl.pack(fill="x")
+    tk.Label(
+        brand_row,
+        text="v0.2",
+        font=fnt(9, "bold"),
+        fg=C["text_secondary"],
+        bg=C["pill_bg"],
+        padx=6,
+        pady=1
+    ).pack(side="left", padx=8)
 
-    def update_engine_status(active, text):
-        def _ui():
-            if active:
-                status_lbl.config(text="● Bufor aktywny", fg=current_theme["status_active"])
-            else:
-                status_lbl.config(text="○ Bufor zatrzymany", fg=current_theme["text_muted"])
-        root.after(0, _ui)
-
-    engine.add_status_listener(update_engine_status)
-
-    # Navigation buttons
-    nav_buttons = []
-    content_frames = {}
-
-    def switch_tab(tab_id):
-        for t_id, f in content_frames.items():
-            if t_id == tab_id:
-                f.pack(fill="both", expand=True, padx=24, pady=20)
-            else:
-                f.pack_forget()
-
-        for btn, b_id in nav_buttons:
-            if b_id == tab_id:
-                btn.config(bg=current_theme["card"], fg=current_theme["text"], font=("Segoe UI", 10, "bold"))
-            else:
-                btn.config(bg=current_theme["sidebar"], fg=current_theme["text_muted"], font=("Segoe UI", 10))
+    # Navigation Buttons Container
+    nav_frame = tk.Frame(sidebar, bg=C["sidebar"])
+    nav_frame.pack(fill="both", expand=True, padx=10, pady=4)
 
     nav_items = [
         ("🎞️  Powtórki", "clips"),
@@ -1150,209 +1161,454 @@ def run_gui(settings, engine, ipc=None):
         ("ℹ️  O programie", "about")
     ]
 
+    nav_buttons = {}
+    content_frames = {}
+    current_tab = ["clips"]
+
+    # Bottom Status Card in Sidebar
+    footer_status_card = tk.Frame(sidebar, bg=C["card"], bd=1, relief="solid", highlightthickness=1, highlightbackground=C["card_border"])
+    footer_status_card.pack(fill="x", side="bottom", padx=12, pady=12, ipady=6, ipadx=8)
+
+    status_row = tk.Frame(footer_status_card, bg=C["card"])
+    status_row.pack(fill="x", padx=6, pady=(4, 2))
+
+    status_dot = tk.Label(status_row, text="●", font=fnt(10, "bold"), fg=C["status_active"], bg=C["card"])
+    status_dot.pack(side="left")
+
+    status_text_lbl = tk.Label(status_row, text="Bufor aktywny", font=fnt(9, "bold"), fg=C["status_active"], bg=C["card"])
+    status_text_lbl.pack(side="left", padx=4)
+
+    quick_toggle_btn = tk.Button(
+        status_row,
+        text="⏸",
+        font=fnt(9, "bold"),
+        fg=C["text"],
+        bg=C["pill_bg"],
+        bd=0,
+        padx=6,
+        pady=1,
+        cursor="hand2"
+    )
+    quick_toggle_btn.pack(side="right")
+
+    status_sub_lbl = tk.Label(
+        footer_status_card,
+        text=f"{settings.Hotkey} • {settings.ClipDuration}s • {settings.Fps} FPS",
+        font=fnt(8),
+        fg=C["text_muted"],
+        bg=C["card"]
+    )
+    status_sub_lbl.pack(anchor="w", padx=6, pady=(0, 2))
+
+    def on_quick_toggle():
+        if engine.is_recording:
+            quick_toggle_btn.config(text="▶", state="disabled")
+            threading.Thread(target=lambda: (engine.stop(), root.after(0, lambda: quick_toggle_btn.config(state="normal"))), daemon=True).start()
+        else:
+            quick_toggle_btn.config(text="⏸", state="disabled")
+            threading.Thread(target=lambda: (engine.start(), root.after(0, lambda: quick_toggle_btn.config(state="normal"))), daemon=True).start()
+
+    quick_toggle_btn.config(command=on_quick_toggle)
+
+    def update_status_badge(active, text):
+        def _ui():
+            if active:
+                status_dot.config(fg=C["status_active"])
+                status_text_lbl.config(text="Bufor aktywny", fg=C["status_active"])
+                quick_toggle_btn.config(text="⏸")
+            else:
+                status_dot.config(fg=C["status_paused"])
+                status_text_lbl.config(text="Bufor zatrzymany", fg=C["text_muted"])
+                quick_toggle_btn.config(text="▶")
+            status_sub_lbl.config(text=f"{settings.Hotkey} • {settings.ClipDuration}s • {settings.Fps} FPS")
+        root.after(0, _ui)
+
+    engine.add_status_listener(update_status_badge)
+
+    # -------------------------------------------------------------------------
+    # RIGHT CONTENT AREA
+    # -------------------------------------------------------------------------
+    right_panel = tk.Frame(root, bg=C["bg"])
+    right_panel.grid(row=0, column=1, sticky="nsew")
+    right_panel.columnconfigure(0, weight=1)
+    right_panel.rowconfigure(0, weight=0)  # Caption / Breadcrumbs
+    right_panel.rowconfigure(1, weight=1)  # Views
+    right_panel.rowconfigure(2, weight=0)  # Subtle Footer
+
+    # 1. Caption & Breadcrumb Bar
+    caption_bar = tk.Frame(right_panel, bg=C["bg"], height=46)
+    caption_bar.grid(row=0, column=0, sticky="ew", padx=24, pady=(10, 4))
+    caption_bar.grid_propagate(False)
+
+    breadcrumb_lbl = tk.Label(
+        caption_bar,
+        text="Rewind › Powtórki",
+        font=fnt(11, "bold"),
+        fg=C["text_secondary"],
+        bg=C["bg"]
+    )
+    breadcrumb_lbl.pack(side="left", pady=8)
+
+    caption_controls = tk.Frame(caption_bar, bg=C["bg"])
+    caption_controls.pack(side="right", pady=4)
+
+    min_btn = tk.Button(
+        caption_controls,
+        text="—",
+        font=fnt(10, "bold"),
+        fg=C["text_muted"],
+        bg=C["bg"],
+        bd=0,
+        padx=8,
+        pady=2,
+        cursor="hand2",
+        command=lambda: root.iconify()
+    )
+    min_btn.pack(side="left", padx=2)
+
+    close_btn = tk.Button(
+        caption_controls,
+        text="✕",
+        font=fnt(10, "bold"),
+        fg=C["text_muted"],
+        bg=C["bg"],
+        bd=0,
+        padx=8,
+        pady=2,
+        cursor="hand2",
+        command=lambda: root.destroy()
+    )
+    close_btn.pack(side="left", padx=2)
+
+    # Hover effects for caption buttons
+    min_btn.bind("<Enter>", lambda e: min_btn.config(bg=C["pill_bg"], fg=C["text"]))
+    min_btn.bind("<Leave>", lambda e: min_btn.config(bg=C["bg"], fg=C["text_muted"]))
+    close_btn.bind("<Enter>", lambda e: close_btn.config(bg="#E81123", fg="#FFFFFF"))
+    close_btn.bind("<Leave>", lambda e: close_btn.config(bg=C["bg"], fg=C["text_muted"]))
+
+    # 2. Views Container
+    views_container = tk.Frame(right_panel, bg=C["bg"])
+    views_container.grid(row=1, column=0, sticky="nsew", padx=24, pady=6)
+    views_container.columnconfigure(0, weight=1)
+    views_container.rowconfigure(0, weight=1)
+
+    # Tab Switching Logic (Smooth & Instantaneous)
+    def switch_tab(tab_id):
+        current_tab[0] = tab_id
+        for t_id, f in content_frames.items():
+            if t_id == tab_id:
+                f.grid(row=0, column=0, sticky="nsew")
+            else:
+                f.grid_forget()
+
+        # Update sidebar navigation buttons
+        for t_id, btn in nav_buttons.items():
+            if t_id == tab_id:
+                btn.config(bg="#1E1E24", fg=C["text"], font=fnt(10, "bold"))
+            else:
+                btn.config(bg=C["sidebar"], fg=C["text_secondary"], font=fnt(10, "normal"))
+
+        # Update breadcrumbs
+        titles = {
+            "clips": "Powtórki",
+            "video": "Wideo i bufor",
+            "audio": "Dźwięk i mikser",
+            "hotkeys": "Skróty klawiszowe",
+            "settings": "Ustawienia",
+            "about": "O programie"
+        }
+        breadcrumb_lbl.config(text=f"Rewind › {titles.get(tab_id, 'Ustawienia')}")
+
+    # Build Navigation Buttons in Sidebar
     for label, tab_id in nav_items:
-        btn = tk.Button(
-            sidebar,
+        b = tk.Button(
+            nav_frame,
             text=label,
-            font=("Segoe UI", 10),
-            fg=current_theme["text_muted"],
-            bg=current_theme["sidebar"],
+            font=fnt(10),
+            fg=C["text_secondary"],
+            bg=C["sidebar"],
             bd=0,
             anchor="w",
             padx=14,
             pady=8,
-            cursor="hand2",
-            activebackground=current_theme["card"],
-            activeforeground=current_theme["text"],
-            command=lambda tid=tab_id: switch_tab(tid)
+            cursor="hand2"
         )
-        btn.pack(fill="x", padx=10, pady=2)
-        nav_buttons.append((btn, tab_id))
+        b.pack(fill="x", pady=2)
+        b.bind("<Enter>", lambda e, btn=b, tid=tab_id: btn.config(bg="#17171C", fg=C["text"]) if current_tab[0] != tid else None)
+        b.bind("<Leave>", lambda e, btn=b, tid=tab_id: btn.config(bg=C["sidebar"], fg=C["text_secondary"]) if current_tab[0] != tid else None)
+        b.config(command=lambda tid=tab_id: switch_tab(tid))
+        nav_buttons[tab_id] = b
 
-    # -------------------------------------------------------------------------
-    # CONTENT CONTAINER
-    # -------------------------------------------------------------------------
-    content_container = tk.Frame(root, bg=current_theme["bg"])
-    content_container.grid(row=0, column=1, sticky="nsew")
+    # Helper: Modern Rounded Card Container
+    def create_card(parent, title, subtitle=""):
+        card = tk.Frame(parent, bg=C["card"], bd=1, relief="solid", highlightthickness=1, highlightbackground=C["card_border"])
+        card.pack(fill="x", pady=6, ipady=10, ipadx=14)
+        tk.Label(card, text=title, font=fnt(11, "bold"), fg=C["text"], bg=C["card"]).pack(anchor="w")
+        if subtitle:
+            tk.Label(card, text=subtitle, font=fnt(9), fg=C["text_muted"], bg=C["card"]).pack(anchor="w", pady=(2, 8))
+        return card
 
-    # 1. VIEW: CLIPS
-    view_clips = tk.Frame(content_container, bg=current_theme["bg"])
+    # =========================================================================
+    # TAB 1: CLIPS (POWTÓRKI)
+    # =========================================================================
+    view_clips = tk.Frame(views_container, bg=C["bg"])
     content_frames["clips"] = view_clips
 
-    # Hero Banner
-    hero_card = tk.Frame(view_clips, bg=current_theme["card"], bd=1, relief="solid")
-    hero_card.pack(fill="x", pady=(0, 16), ipady=12, ipadx=14)
+    # Hero Card (Raycast Signature Banner)
+    hero_card = tk.Frame(view_clips, bg=C["card"], bd=1, relief="solid", highlightthickness=1, highlightbackground=C["card_border"])
+    hero_card.pack(fill="x", pady=(0, 14), ipady=14, ipadx=16)
 
     hero_hotkey_badge = tk.Label(
         hero_card,
         text=f"[{settings.Hotkey}]",
-        font=("Segoe UI", 10, "bold"),
-        fg=current_theme["accent"],
-        bg=current_theme["pill_bg"],
+        font=fnt(9, "bold"),
+        fg=C["accent"],
+        bg=C["pill_active_bg"],
         padx=8,
         pady=2
     )
-    hero_hotkey_badge.pack(anchor="w", pady=(0, 4))
+    hero_hotkey_badge.pack(anchor="w")
 
     hero_title = tk.Label(
         hero_card,
         text=f"Zapisz ostatnie {settings.ClipDuration} sekund",
-        font=("Segoe UI", 16, "bold"),
-        fg=current_theme["text"],
-        bg=current_theme["card"]
+        font=fnt(16, "bold"),
+        fg=C["text"],
+        bg=C["card"]
     )
-    hero_title.pack(anchor="w")
+    hero_title.pack(anchor="w", pady=(4, 2))
+
+    hero_sub = tk.Label(
+        hero_card,
+        text=f"Naciśnij {settings.Hotkey} w dowolnej grze lub aplikacji, aby natychmiast utworzyć powtórkę MP4.",
+        font=fnt(9),
+        fg=C["text_muted"],
+        bg=C["card"]
+    )
+    hero_sub.pack(anchor="w", pady=(0, 10))
 
     hero_btn = tk.Button(
         hero_card,
         text="⚡ Zapisz powtórkę teraz",
-        font=("Segoe UI", 11, "bold"),
+        font=fnt(10, "bold"),
         fg="#FFFFFF",
-        bg=current_theme["accent"],
+        bg=C["accent"],
         bd=0,
-        padx=16,
-        pady=6,
-        cursor="hand2",
-        command=lambda: engine.save_clip()
+        padx=18,
+        pady=8,
+        cursor="hand2"
     )
-    hero_btn.pack(anchor="e", pady=(6, 0))
+    hero_btn.pack(anchor="e")
 
-    # Clips List
-    clips_header = tk.Frame(view_clips, bg=current_theme["bg"])
-    clips_header.pack(fill="x", pady=(10, 6))
+    def on_hero_click():
+        hero_btn.config(text="⏳ Zapisywanie...", state="disabled")
+        threading.Thread(target=lambda: engine.save_clip(), daemon=True).start()
 
-    tk.Label(
-        clips_header,
+    hero_btn.config(command=on_hero_click)
+
+    # Toast Notification Banner for Saved Clips
+    toast_banner = tk.Frame(view_clips, bg=C["status_active_bg"], bd=1, relief="solid", highlightthickness=1, highlightbackground=C["status_active"])
+    toast_lbl = tk.Label(toast_banner, text="✓ Zapisano klip pomyślnie!", font=fnt(9, "bold"), fg=C["status_active"], bg=C["status_active_bg"])
+    toast_lbl.pack(side="left", padx=12, pady=6)
+
+    toast_open_btn = tk.Button(toast_banner, text="▶ Odtwórz", font=fnt(8, "bold"), fg="#FFFFFF", bg=C["status_active"], bd=0, padx=8, pady=2, cursor="hand2")
+    toast_open_btn.pack(side="right", padx=10, pady=4)
+
+    def show_toast(clip_path):
+        def _ui():
+            toast_lbl.config(text=f"✓ Zapisano klip: {Path(clip_path).name}")
+            toast_open_btn.config(command=lambda: subprocess.Popen(["xdg-open", str(clip_path)]))
+            toast_banner.pack(fill="x", pady=(0, 12), before=clips_header_frame)
+            root.after(6000, lambda: toast_banner.pack_forget())
+        root.after(0, _ui)
+
+    # Clips List Section
+    clips_header_frame = tk.Frame(view_clips, bg=C["bg"])
+    clips_header_frame.pack(fill="x", pady=(4, 8))
+
+    clips_count_lbl = tk.Label(
+        clips_header_frame,
         text="ZAPISANE KLIPY",
-        font=("Segoe UI", 10, "bold"),
-        fg=current_theme["text_muted"],
-        bg=current_theme["bg"]
-    ).pack(side="left")
+        font=fnt(9, "bold"),
+        fg=C["text_muted"],
+        bg=C["bg"]
+    )
+    clips_count_lbl.pack(side="left")
 
     open_folder_btn = tk.Button(
-        clips_header,
+        clips_header_frame,
         text="📂 Otwórz folder",
-        font=("Segoe UI", 9),
-        fg=current_theme["text"],
-        bg=current_theme["card"],
-        bd=1,
-        relief="solid",
-        padx=8,
-        pady=2,
+        font=fnt(9),
+        fg=C["text_secondary"],
+        bg=C["pill_bg"],
+        bd=0,
+        padx=10,
+        pady=3,
         cursor="hand2",
         command=lambda: subprocess.Popen(["xdg-open", settings.ClipsFolder])
     )
     open_folder_btn.pack(side="right")
 
-    clips_list_frame = tk.Frame(view_clips, bg=current_theme["bg"])
-    clips_list_frame.pack(fill="both", expand=True)
+    clips_scroll_container = tk.Frame(view_clips, bg=C["bg"])
+    clips_scroll_container.pack(fill="both", expand=True)
+
+    selected_clip_path = [None]
 
     def refresh_clips_list():
-        for widget in clips_list_frame.winfo_children():
-            widget.destroy()
+        for w in clips_scroll_container.winfo_children():
+            w.destroy()
 
         clips_dir = Path(settings.ClipsFolder)
         if not clips_dir.exists():
             return
 
         mp4_files = sorted(clips_dir.glob("Clip_*.mp4"), key=lambda f: f.stat().st_mtime, reverse=True)
+        clips_count_lbl.config(text=f"ZAPISANE KLIPY ({len(mp4_files)})")
+
         if not mp4_files:
-            tk.Label(
-                clips_list_frame,
-                text=f"Brak zapisanych powtórek. Naciśnij {settings.Hotkey}, aby utworzyć pierwszy klip!",
-                font=("Segoe UI", 10),
-                fg=current_theme["text_muted"],
-                bg=current_theme["bg"],
-                pady=30
-            ).pack()
+            empty_lbl = tk.Label(
+                clips_scroll_container,
+                text=f"Brak zapisanych powtórek.\nNaciśnij {settings.Hotkey} podczas gry, aby utworzyć pierwszy klip!",
+                font=fnt(10),
+                fg=C["text_muted"],
+                bg=C["bg"],
+                pady=40
+            )
+            empty_lbl.pack()
             return
 
-        for f in mp4_files[:8]:
-            row = tk.Frame(clips_list_frame, bg=current_theme["card"], bd=1, relief="solid")
-            row.pack(fill="x", pady=4, ipady=6, ipadx=10)
+        for f in mp4_files[:10]:
+            card = tk.Frame(clips_scroll_container, bg=C["card"], bd=1, relief="solid", highlightthickness=1, highlightbackground=C["card_border"])
+            card.pack(fill="x", pady=3, ipady=6, ipadx=10)
 
             size_mb = f.stat().st_size / (1024 * 1024)
+            date_str = time.strftime("%Y-%m-%d %H:%M", time.localtime(f.stat().st_mtime))
+
+            left_box = tk.Frame(card, bg=C["card"])
+            left_box.pack(side="left", fill="both", expand=True)
+
             name_lbl = tk.Label(
-                row,
-                text=f"🎬 {f.name} ({size_mb:.1f} MB)",
-                font=("Segoe UI", 10, "bold"),
-                fg=current_theme["text"],
-                bg=current_theme["card"]
+                left_box,
+                text=f"🎬  {f.name}",
+                font=fnt(10, "bold"),
+                fg=C["text"],
+                bg=C["card"],
+                anchor="w"
             )
-            name_lbl.pack(side="left")
+            name_lbl.pack(anchor="w")
 
-            del_btn = tk.Button(
-                row,
-                text="🗑️",
-                font=("Segoe UI", 9),
-                fg="#EF4444",
-                bg=current_theme["pill_bg"],
-                bd=0,
-                padx=6,
-                cursor="hand2",
-                command=lambda p=f: delete_clip(p)
+            info_lbl = tk.Label(
+                left_box,
+                text=f"{date_str}  •  {size_mb:.1f} MB  (kliknij dwukrotnie, aby odtworzyć)",
+                font=fnt(8),
+                fg=C["text_muted"],
+                bg=C["card"],
+                anchor="w"
             )
-            del_btn.pack(side="right", padx=4)
+            info_lbl.pack(anchor="w")
 
-            trim_btn = tk.Button(
-                row,
-                text="✂️ Przytnij",
-                font=("Segoe UI", 9),
-                fg=current_theme["text"],
-                bg=current_theme["pill_bg"],
-                bd=0,
-                padx=8,
-                cursor="hand2",
-                command=lambda p=f: show_trim_dialog(p)
-            )
-            trim_btn.pack(side="right", padx=4)
+            # Actions
+            btn_box = tk.Frame(card, bg=C["card"])
+            btn_box.pack(side="right")
 
-            play_btn = tk.Button(
-                row,
+            play_b = tk.Button(
+                btn_box,
                 text="▶ Odtwórz",
-                font=("Segoe UI", 9),
-                fg=current_theme["text"],
-                bg=current_theme["pill_bg"],
+                font=fnt(8, "bold"),
+                fg=C["text"],
+                bg=C["pill_bg"],
                 bd=0,
                 padx=8,
+                pady=3,
                 cursor="hand2",
                 command=lambda p=f: subprocess.Popen(["xdg-open", str(p)])
             )
-            play_btn.pack(side="right", padx=4)
+            play_b.pack(side="left", padx=2)
 
+            trim_b = tk.Button(
+                btn_box,
+                text="✂️ Przytnij",
+                font=fnt(8),
+                fg=C["text_secondary"],
+                bg=C["pill_bg"],
+                bd=0,
+                padx=8,
+                pady=3,
+                cursor="hand2",
+                command=lambda p=f: show_trim_dialog(p)
+            )
+            trim_b.pack(side="left", padx=2)
+
+            del_b = tk.Button(
+                btn_box,
+                text="🗑️",
+                font=fnt(8),
+                fg="#EF4444",
+                bg=C["pill_bg"],
+                bd=0,
+                padx=6,
+                pady=3,
+                cursor="hand2",
+                command=lambda p=f: delete_clip(p)
+            )
+            del_b.pack(side="left", padx=2)
+
+            # Double-click to play (Windows parity)
+            for widget in [card, left_box, name_lbl, info_lbl]:
+                widget.bind("<Double-Button-1>", lambda e, p=f: subprocess.Popen(["xdg-open", str(p)]))
+                widget.bind("<Button-1>", lambda e, p=f: select_clip(p))
+
+    def select_clip(p):
+        selected_clip_path[0] = p
+
+    def delete_clip(file_path):
+        if messagebox.askyesno("Usuń klip", f"Czy na pewno chcesz usunąć powtórkę {file_path.name}?"):
+            try:
+                file_path.unlink()
+                refresh_clips_list()
+            except Exception as e:
+                messagebox.showerror("Błąd", str(e))
+
+    # Delete key shortcut (Windows parity)
+    root.bind("<Delete>", lambda e: delete_clip(selected_clip_path[0]) if selected_clip_path[0] else None)
+
+    # Listeners for Saving status
+    engine.add_clip_saving_listener(lambda dur: root.after(0, lambda: hero_btn.config(text="⏳ Zapisywanie...", state="disabled")))
+    engine.add_clip_saved_done_listener(lambda: root.after(0, lambda: hero_btn.config(text="⚡ Zapisz powtórkę teraz", state="normal")))
+    engine.add_clip_saved_listener(lambda path, dur: (show_toast(path), root.after(0, refresh_clips_list)))
+
+    # Modal Trim Dialog (Non-blocking & Asynchronous)
     def show_trim_dialog(file_path):
         dlg = tk.Toplevel(root)
-        dlg.title("Szybkie przycinanie klipu")
-        dlg.geometry("420x220")
-        dlg.configure(bg=current_theme["card"])
+        dlg.title("Przycinanie powtórki")
+        dlg.geometry("440x230")
+        dlg.configure(bg=C["card"])
         dlg.resizable(False, False)
         dlg.transient(root)
         dlg.grab_set()
 
-        tk.Label(dlg, text="✂️ Szybkie przycinanie powtórki", font=("Segoe UI", 12, "bold"), fg=current_theme["text"], bg=current_theme["card"]).pack(anchor="w", padx=18, pady=(16, 2))
-        tk.Label(dlg, text=file_path.name, font=("Segoe UI", 9), fg=current_theme["text_muted"], bg=current_theme["card"]).pack(anchor="w", padx=18, pady=(0, 14))
+        tk.Label(dlg, text="✂️ Szybkie przycinanie powtórki", font=fnt(12, "bold"), fg=C["text"], bg=C["card"]).pack(anchor="w", padx=20, pady=(18, 2))
+        tk.Label(dlg, text=file_path.name, font=fnt(9), fg=C["text_muted"], bg=C["card"]).pack(anchor="w", padx=20, pady=(0, 14))
 
-        fields_frame = tk.Frame(dlg, bg=current_theme["card"])
-        fields_frame.pack(fill="x", padx=18, pady=(0, 16))
+        fields = tk.Frame(dlg, bg=C["card"])
+        fields.pack(fill="x", padx=20, pady=(0, 16))
 
-        # Start
-        s_col = tk.Frame(fields_frame, bg=current_theme["card"])
+        s_col = tk.Frame(fields, bg=C["card"])
         s_col.pack(side="left", fill="x", expand=True, padx=(0, 8))
-        tk.Label(s_col, text="Początek (sekundy):", font=("Segoe UI", 9), fg=current_theme["text_muted"], bg=current_theme["card"]).pack(anchor="w")
-        s_entry = tk.Entry(s_col, font=("Segoe UI", 11), bg=current_theme["pill_bg"], fg=current_theme["text"], bd=1, relief="solid")
+        tk.Label(s_col, text="Początek (sekundy):", font=fnt(9), fg=C["text_secondary"], bg=C["card"]).pack(anchor="w")
+        s_entry = tk.Entry(s_col, font=fnt(11), bg=C["pill_bg"], fg=C["text"], bd=1, relief="solid")
         s_entry.insert(0, "0")
         s_entry.pack(fill="x", pady=4)
 
-        # End
-        e_col = tk.Frame(fields_frame, bg=current_theme["card"])
+        e_col = tk.Frame(fields, bg=C["card"])
         e_col.pack(side="left", fill="x", expand=True, padx=(8, 0))
-        tk.Label(e_col, text="Koniec (sekundy):", font=("Segoe UI", 9), fg=current_theme["text_muted"], bg=current_theme["card"]).pack(anchor="w")
-        e_entry = tk.Entry(e_col, font=("Segoe UI", 11), bg=current_theme["pill_bg"], fg=current_theme["text"], bd=1, relief="solid")
+        tk.Label(e_col, text="Koniec (sekundy):", font=fnt(9), fg=C["text_secondary"], bg=C["card"]).pack(anchor="w")
+        e_entry = tk.Entry(e_col, font=fnt(11), bg=C["pill_bg"], fg=C["text"], bd=1, relief="solid")
         e_entry.insert(0, "15")
         e_entry.pack(fill="x", pady=4)
 
-        btn_row = tk.Frame(dlg, bg=current_theme["card"])
-        btn_row.pack(fill="x", padx=18, pady=(6, 16))
+        btn_row = tk.Frame(dlg, bg=C["card"])
+        btn_row.pack(fill="x", padx=20, pady=(4, 16))
 
         def on_save_trim():
             try:
@@ -1366,572 +1622,450 @@ def run_gui(settings, engine, ipc=None):
                 messagebox.showerror("Błąd", "Czas końca musi być większy niż czas początku (>= 0).")
                 return
 
-            # Asynchronous trimming in background thread to prevent Tkinter freezing (W-10)
-            save_btn.config(text="⏳ Przycinanie...", state="disabled")
-            cancel_btn.config(state="disabled")
+            save_trim_btn.config(text="⏳ Przycinanie...", state="disabled")
 
-            def _async_trim():
+            def _worker():
                 success, res = engine.trim_clip(file_path, start_val, end_val)
-                def _finish():
+                def _done():
                     if dlg.winfo_exists():
-                        save_btn.config(text="⚡ Zapisz przycięty klip", state="normal")
-                        cancel_btn.config(state="normal")
+                        dlg.destroy()
                         if success:
-                            dlg.destroy()
                             refresh_clips_list()
-                            show_notification("Rewind", f"✂️ Klip przycięty: {Path(res).name}")
+                            show_toast(res)
                         else:
-                            messagebox.showerror("Błąd przycinania", res)
-                root.after(0, _finish)
+                            messagebox.showerror("Błąd", res)
+                root.after(0, _done)
 
-            threading.Thread(target=_async_trim, daemon=True).start()
+            threading.Thread(target=_worker, daemon=True).start()
 
-        save_btn = tk.Button(btn_row, text="⚡ Zapisz przycięty klip", font=("Segoe UI", 9, "bold"), fg="#FFFFFF", bg=current_theme["accent"], bd=0, padx=12, pady=6, cursor="hand2", command=on_save_trim)
-        save_btn.pack(side="right")
+        save_trim_btn = tk.Button(btn_row, text="⚡ Zapisz przycięty klip", font=fnt(9, "bold"), fg="#FFFFFF", bg=C["accent"], bd=0, padx=14, pady=6, cursor="hand2", command=on_save_trim)
+        save_trim_btn.pack(side="right")
 
-        cancel_btn = tk.Button(btn_row, text="Anuluj", font=("Segoe UI", 9), fg=current_theme["text_muted"], bg=current_theme["pill_bg"], bd=0, padx=12, pady=6, cursor="hand2", command=dlg.destroy)
-        cancel_btn.pack(side="right", padx=8)
+        cancel_trim_btn = tk.Button(btn_row, text="Anuluj", font=fnt(9), fg=C["text_muted"], bg=C["pill_bg"], bd=0, padx=12, pady=6, cursor="hand2", command=dlg.destroy)
+        cancel_trim_btn.pack(side="right", padx=8)
 
-    def delete_clip(file_path):
-        if messagebox.askyesno("Usuń klip", f"Czy na pewno chcesz usunąć {file_path.name}?"):
-            try:
-                file_path.unlink()
-                refresh_clips_list()
-            except Exception as e:
-                messagebox.showerror("Błąd", str(e))
-
-    def on_saving_start(dur):
-        hero_btn.config(text="⏳ Zapisywanie...", state="disabled")
-
-    def on_saving_done():
-        hero_btn.config(text="⚡ Zapisz powtórkę teraz", state="normal")
-
-    engine.add_clip_saving_listener(lambda dur: root.after(0, lambda: on_saving_start(dur)))
-    engine.add_clip_saved_done_listener(lambda: root.after(0, on_saving_done))
-    engine.add_clip_saved_listener(lambda path, dur: root.after(0, refresh_clips_list))
     refresh_clips_list()
 
-    # 2. VIEW: VIDEO SETTINGS
-    view_video = tk.Frame(content_container, bg=current_theme["bg"])
+    # =========================================================================
+    # TAB 2: VIDEO & BUFFER SETTINGS (WIDEO I BUFOR)
+    # =========================================================================
+    view_video = tk.Frame(views_container, bg=C["bg"])
     content_frames["video"] = view_video
 
-    def make_card(parent, title, subtitle):
-        f = tk.Frame(parent, bg=current_theme["card"], bd=1, relief="solid")
-        f.pack(fill="x", pady=6, ipady=8, ipadx=12)
-        tk.Label(f, text=title, font=("Segoe UI", 11, "bold"), fg=current_theme["text"], bg=current_theme["card"]).pack(anchor="w")
-        tk.Label(f, text=subtitle, font=("Segoe UI", 9), fg=current_theme["text_muted"], bg=current_theme["card"]).pack(anchor="w", pady=(0, 6))
-        return f
+    # Helper for in-place pill highlights (0 ms latency, no redraw!)
+    def setup_pill_group(parent_frame, options, active_val, on_select):
+        btns = {}
+        for opt in options:
+            label = f"{opt}s" if isinstance(opt, int) and opt < 300 and "FPS" not in str(opt) else str(opt)
+            if "FPS" not in label and "Mbps" not in label and not label.endswith("s") and not label.endswith("GB") and not label.endswith("dni"):
+                label = f"{opt} FPS" if "FPS" in parent_frame.winfo_name() else label
+
+            is_active = (opt == active_val)
+            b = tk.Button(
+                parent_frame,
+                text=label,
+                font=fnt(9, "bold" if is_active else "normal"),
+                fg="#FFFFFF" if is_active else C["text_secondary"],
+                bg=C["pill_active"] if is_active else C["pill_bg"],
+                bd=0,
+                padx=12,
+                pady=5,
+                cursor="hand2"
+            )
+            b.pack(side="left", padx=3)
+            btns[opt] = b
+
+        def _select(val):
+            for k, btn in btns.items():
+                if k == val:
+                    btn.config(bg=C["pill_active"], fg="#FFFFFF", font=fnt(9, "bold"))
+                else:
+                    btn.config(bg=C["pill_bg"], fg=C["text_secondary"], font=fnt(9, "normal"))
+            on_select(val)
+
+        for k, btn in btns.items():
+            btn.config(command=lambda v=k: _select(v))
+
+        return _select
 
     # Duration Card
-    c_dur = make_card(view_video, "Długość bufora wideo", "Czas rejestrowany w pamięci podręcznej")
-    dur_frame = tk.Frame(c_dur, bg=current_theme["card"])
+    c_dur = create_card(view_video, "Długość bufora wideo", "Czas rejestrowany wstecz w pamięci podręcznej")
+    dur_frame = tk.Frame(c_dur, bg=C["card"])
     dur_frame.pack(anchor="w")
 
-    for d in [15, 30, 60, 120]:
-        b = tk.Button(
-            dur_frame,
-            text=f"{d}s",
-            font=("Segoe UI", 9, "bold" if settings.ClipDuration == d else "normal"),
-            bg=current_theme["pill_active"] if settings.ClipDuration == d else current_theme["pill_bg"],
-            fg="#FFFFFF" if settings.ClipDuration == d else current_theme["text"],
-            bd=0,
-            padx=10,
-            pady=4,
-            cursor="hand2",
-            command=lambda val=d: set_duration(val)
-        )
-        b.pack(side="left", padx=3)
-
-    def set_duration(d):
+    def on_set_duration(d):
         settings.ClipDuration = d
         settings.save()
         hero_title.config(text=f"Zapisz ostatnie {d} sekund")
-        switch_tab("video")
+        status_sub_lbl.config(text=f"{settings.Hotkey} • {d}s • {settings.Fps} FPS")
+
+    setup_pill_group(dur_frame, [15, 30, 60, 120], settings.ClipDuration, on_set_duration)
 
     # FPS Card
-    c_fps = make_card(view_video, "Płynność nagrywania (FPS)", "Liczba klatek na sekundę dla bufora")
-    fps_frame = tk.Frame(c_fps, bg=current_theme["card"])
+    c_fps = create_card(view_video, "Płynność nagrywania (FPS)", "Liczba klatek na sekundę dla bufora wideo")
+    fps_frame = tk.Frame(c_fps, bg=C["card"], name="fps_frame")
     fps_frame.pack(anchor="w")
 
-    for f in [30, 60, 120, 144]:
-        b = tk.Button(
-            fps_frame,
-            text=f"{f} FPS",
-            font=("Segoe UI", 9, "bold" if settings.Fps == f else "normal"),
-            bg=current_theme["pill_active"] if settings.Fps == f else current_theme["pill_bg"],
-            fg="#FFFFFF" if settings.Fps == f else current_theme["text"],
-            bd=0,
-            padx=10,
-            pady=4,
-            cursor="hand2",
-            command=lambda val=f: set_fps(val)
-        )
-        b.pack(side="left", padx=3)
-
-    def set_fps(f):
+    def on_set_fps(f):
         settings.Fps = f
         settings.save()
-        engine.stop()
-        engine.start()
-        switch_tab("video")
+        status_sub_lbl.config(text=f"{settings.Hotkey} • {settings.ClipDuration}s • {f} FPS")
+        threading.Thread(target=lambda: (engine.stop(), engine.start()), daemon=True).start()
+
+    setup_pill_group(fps_frame, [30, 60, 120, 144], settings.Fps, on_set_fps)
 
     # Bitrate Card
-    c_bit = make_card(view_video, "Jakość wideo (Bitrate)", "Przepływność strumienia wideo")
-    bit_frame = tk.Frame(c_bit, bg=current_theme["card"])
+    c_bit = create_card(view_video, "Jakość wideo (Bitrate)", "Przepływność strumienia wideo")
+    bit_frame = tk.Frame(c_bit, bg=C["card"])
     bit_frame.pack(anchor="w")
 
-    for b_val in ["8M", "12M", "16M"]:
-        b = tk.Button(
-            bit_frame,
-            text=f"{b_val.replace('M', ' Mbps')}",
-            font=("Segoe UI", 9, "bold" if settings.Bitrate == b_val else "normal"),
-            bg=current_theme["pill_active"] if settings.Bitrate == b_val else current_theme["pill_bg"],
-            fg="#FFFFFF" if settings.Bitrate == b_val else current_theme["text"],
-            bd=0,
-            padx=10,
-            pady=4,
-            cursor="hand2",
-            command=lambda val=b_val: set_bitrate(val)
-        )
-        b.pack(side="left", padx=3)
-
-    def set_bitrate(b_val):
-        settings.Bitrate = b_val
+    def on_set_bitrate(b):
+        settings.Bitrate = b
         settings.save()
-        engine.stop()
-        engine.start()
-        switch_tab("video")
+        threading.Thread(target=lambda: (engine.stop(), engine.start()), daemon=True).start()
 
-    # GPU Acceleration Card
-    c_gpu = make_card(view_video, "Akcelerator sprzętowy GPU", f"Wykryty silnik enkodera: {engine.encoder.upper()}")
+    setup_pill_group(bit_frame, ["8M", "12M", "16M"], settings.Bitrate, on_set_bitrate)
 
-    # 3. VIEW: AUDIO SETTINGS
-    view_audio = tk.Frame(content_container, bg=current_theme["bg"])
+    # Folder Location Card
+    c_folder = create_card(view_video, "Lokalizacja zapisu powtórek", "Katalog, w którym zapisywane są gotowe pliki MP4")
+    f_row = tk.Frame(c_folder, bg=C["card"])
+    f_row.pack(fill="x", pady=(2, 4))
+
+    folder_lbl = tk.Label(f_row, text=settings.ClipsFolder, font=fnt(9), fg=C["text_secondary"], bg=C["pill_bg"], padx=10, pady=5)
+    folder_lbl.pack(side="left", fill="x", expand=True)
+
+    def on_choose_folder():
+        new_d = filedialog.askdirectory(initialdir=settings.ClipsFolder)
+        if new_d:
+            settings.ClipsFolder = new_d
+            settings.save()
+            folder_lbl.config(text=new_d)
+            refresh_clips_list()
+
+    change_f_btn = tk.Button(f_row, text="Zmień folder", font=fnt(9, "bold"), fg=C["text"], bg=C["pill_bg"], bd=0, padx=12, pady=5, cursor="hand2", command=on_choose_folder)
+    change_f_btn.pack(side="left", padx=8)
+
+    # =========================================================================
+    # TAB 3: AUDIO SETTINGS (DŹWIĘK I MIKSER)
+    # =========================================================================
+    view_audio = tk.Frame(views_container, bg=C["bg"])
     content_frames["audio"] = view_audio
 
-    c_sysvol = make_card(view_audio, "Głośność dźwięku z komputera", "Dźwięki z gier, Discorda i systemu (PulseAudio / PipeWire)")
-    sysvol_container = tk.Frame(c_sysvol, bg=current_theme["card"])
-    sysvol_container.pack(anchor="w")
+    # System Audio Volume
+    c_sysvol = create_card(view_audio, "Głośność dźwięku z komputera", "Dźwięki z gier, Discorda i systemu (PipeWire / PulseAudio)")
+    sys_val_lbl = tk.Label(c_sysvol, text=f"{settings.SystemVolumePercent}%", font=fnt(10, "bold"), fg=C["accent"], bg=C["card"])
+    sys_val_lbl.pack(anchor="w")
 
-    def update_sys_vol(v):
-        settings.SystemVolumePercent = v
-        settings.save()
-
-    c_micvol = make_card(view_audio, "Głośność mikrofonu", "Rejestrowanie Twojego głosu podczas rozgrywki")
-    micvol_container = tk.Frame(c_micvol, bg=current_theme["card"])
-    micvol_container.pack(anchor="w")
-
-    def update_mic_vol(v):
-        settings.MicVolumePercent = v
-        settings.save()
-
-    def update_audio_controls():
-        for widget in sysvol_container.winfo_children():
-            widget.destroy()
-        for widget in micvol_container.winfo_children():
-            widget.destroy()
-
-        if settings.AdvancedMode:
-            # Sys vol advanced entry (0-1000%)
-            s_row = tk.Frame(sysvol_container, bg=current_theme["card"])
-            s_row.pack(anchor="w")
-            s_entry = tk.Entry(s_row, font=("Segoe UI", 10, "bold"), bg=current_theme["pill_bg"], fg=current_theme["text"], bd=1, relief="solid", width=8)
-            s_entry.insert(0, str(settings.SystemVolumePercent))
-            s_entry.pack(side="left")
-            tk.Label(s_row, text="% (0 - 1000%)", font=("Segoe UI", 9), fg=current_theme["text_muted"], bg=current_theme["card"]).pack(side="left", padx=8)
-
-            def apply_sys_vol(*args):
-                try:
-                    val = int(s_entry.get().replace("%", "").strip())
-                    val = max(0, min(1000, val))
-                    settings.SystemVolumePercent = val
-                    settings.save()
-                    s_entry.delete(0, "end")
-                    s_entry.insert(0, str(val))
-                except ValueError:
-                    s_entry.delete(0, "end")
-                    s_entry.insert(0, str(settings.SystemVolumePercent))
-
-            def on_sys_key(event=None):
-                try:
-                    txt = s_entry.get().replace("%", "").strip()
-                    if txt:
-                        val = max(0, min(1000, int(txt)))
-                        settings.SystemVolumePercent = val
-                        settings.save()
-                except:
-                    pass
-
-            s_btn = tk.Button(s_row, text="Zastosuj", font=("Segoe UI", 8, "bold"), bg=current_theme["accent"], fg="#FFFFFF", bd=0, padx=8, pady=2, cursor="hand2", command=apply_sys_vol)
-            s_btn.pack(side="left", padx=4)
-            s_entry.bind("<KeyRelease>", on_sys_key)
-            s_entry.bind("<Return>", lambda e: apply_sys_vol())
-            s_entry.bind("<FocusOut>", lambda e: apply_sys_vol())
-
-            # Mic vol advanced entry (0-1000%)
-            m_row = tk.Frame(micvol_container, bg=current_theme["card"])
-            m_row.pack(anchor="w")
-            m_entry = tk.Entry(m_row, font=("Segoe UI", 10, "bold"), bg=current_theme["pill_bg"], fg=current_theme["text"], bd=1, relief="solid", width=8)
-            m_entry.insert(0, str(settings.MicVolumePercent))
-            m_entry.pack(side="left")
-            tk.Label(m_row, text="% (0 - 1000%)", font=("Segoe UI", 9), fg=current_theme["text_muted"], bg=current_theme["card"]).pack(side="left", padx=8)
-
-            def apply_mic_vol(*args):
-                try:
-                    val = int(m_entry.get().replace("%", "").strip())
-                    val = max(0, min(1000, val))
-                    settings.MicVolumePercent = val
-                    settings.save()
-                    m_entry.delete(0, "end")
-                    m_entry.insert(0, str(val))
-                except ValueError:
-                    m_entry.delete(0, "end")
-                    m_entry.insert(0, str(settings.MicVolumePercent))
-
-            def on_mic_key(event=None):
-                try:
-                    txt = m_entry.get().replace("%", "").strip()
-                    if txt:
-                        val = max(0, min(1000, int(txt)))
-                        settings.MicVolumePercent = val
-                        settings.save()
-                except:
-                    pass
-
-            m_btn = tk.Button(m_row, text="Zastosuj", font=("Segoe UI", 8, "bold"), bg=current_theme["accent"], fg="#FFFFFF", bd=0, padx=8, pady=2, cursor="hand2", command=apply_mic_vol)
-            m_btn.pack(side="left", padx=4)
-            m_entry.bind("<KeyRelease>", on_mic_key)
-            m_entry.bind("<Return>", lambda e: apply_mic_vol())
-            m_entry.bind("<FocusOut>", lambda e: apply_mic_vol())
-        else:
-            is_updating = [True]
-            try:
-                sys_scale = tk.Scale(
-                    sysvol_container,
-                    from_=0,
-                    to=150,
-                    orient="horizontal",
-                    bg=current_theme["card"],
-                    fg=current_theme["text"],
-                    highlightthickness=0,
-                    bd=0,
-                    length=350,
-                    command=lambda v: update_sys_vol(int(v)) if not is_updating[0] else None
-                )
-                sys_scale.set(min(150, settings.SystemVolumePercent))
-                sys_scale.pack(anchor="w")
-
-                mic_scale = tk.Scale(
-                    micvol_container,
-                    from_=0,
-                    to=150,
-                    orient="horizontal",
-                    bg=current_theme["card"],
-                    fg=current_theme["text"],
-                    highlightthickness=0,
-                    bd=0,
-                    length=350,
-                    command=lambda v: update_mic_vol(int(v)) if not is_updating[0] else None
-                )
-                mic_scale.set(min(150, settings.MicVolumePercent))
-                mic_scale.pack(anchor="w")
-            finally:
-                is_updating[0] = False
-
-    update_audio_controls()
-
-    c_snd = make_card(view_audio, "Dźwięk potwierdzenia", "Odtwarzaj dźwięk po pomyślnym utworzeniu klipu")
-    test_btn = tk.Button(
-        c_snd,
-        text="🔔 Odtwórz dźwięk testowy",
-        font=("Segoe UI", 9),
-        bg=current_theme["pill_bg"],
-        fg=current_theme["text"],
+    sys_slider = tk.Scale(
+        c_sysvol,
+        from_=0,
+        to=1000 if settings.AdvancedMode else 150,
+        orient="horizontal",
+        showvalue=False,
+        bg=C["card"],
+        fg=C["accent"],
+        troughcolor=C["pill_bg"],
+        activebackground=C["accent_hover"],
+        highlightthickness=0,
         bd=0,
-        padx=10,
-        pady=4,
+        length=420
+    )
+    sys_slider.set(settings.SystemVolumePercent)
+    sys_slider.pack(anchor="w", pady=(4, 6))
+
+    def on_sys_change(v):
+        val = int(v)
+        settings.SystemVolumePercent = val
+        settings.save()
+        sys_val_lbl.config(text=f"{val}%")
+
+    sys_slider.config(command=on_sys_change)
+
+    # Microphone Volume
+    c_micvol = create_card(view_audio, "Głośność mikrofonu", "Rejestrowanie Twojego głosu podczas rozgrywki")
+    mic_val_lbl = tk.Label(c_micvol, text=f"{settings.MicVolumePercent}%", font=fnt(10, "bold"), fg=C["accent"], bg=C["card"])
+    mic_val_lbl.pack(anchor="w")
+
+    mic_slider = tk.Scale(
+        c_micvol,
+        from_=0,
+        to=1000 if settings.AdvancedMode else 150,
+        orient="horizontal",
+        showvalue=False,
+        bg=C["card"],
+        fg=C["accent"],
+        troughcolor=C["pill_bg"],
+        activebackground=C["accent_hover"],
+        highlightthickness=0,
+        bd=0,
+        length=420
+    )
+    mic_slider.set(settings.MicVolumePercent)
+    mic_slider.pack(anchor="w", pady=(4, 6))
+
+    def on_mic_change(v):
+        val = int(v)
+        settings.MicVolumePercent = val
+        settings.save()
+        mic_val_lbl.config(text=f"{val}%")
+
+    mic_slider.config(command=on_mic_change)
+
+    # Multi-track Audio Card
+    c_multi = create_card(view_audio, "Osobne ścieżki audio w pliku MP4 (Multi-track)", "Zapisuj dźwięk gry i mikrofon na niezależnych ścieżkach do montażu w Premiere / DaVinci")
+    multi_var = tk.BooleanVar(value=settings.SeparateAudioTracks)
+
+    def on_toggle_multi():
+        settings.SeparateAudioTracks = multi_var.get()
+        settings.save()
+        threading.Thread(target=lambda: (engine.stop(), engine.start()), daemon=True).start()
+
+    multi_chk = tk.Checkbutton(
+        c_multi,
+        text="Włącz Multi-track (Ścieżka 1: Dźwięk gry, Ścieżka 2: Mikrofon)",
+        variable=multi_var,
+        font=fnt(10),
+        bg=C["card"],
+        fg=C["text"],
+        selectcolor=C["pill_bg"],
+        activebackground=C["card"],
+        activeforeground=C["text"],
+        command=on_toggle_multi
+    )
+    multi_chk.pack(anchor="w")
+
+    # Sound Notification Card
+    c_sound = create_card(view_audio, "Dźwięk potwierdzenia zapisu", "Odtwarzaj krótki dźwięk po pomyślnym zapisaniu powtórki")
+    tk.Button(
+        c_sound,
+        text="🔔 Odtwórz dźwięk testowy",
+        font=fnt(9),
+        fg=C["text"],
+        bg=C["pill_bg"],
+        bd=0,
+        padx=12,
+        pady=5,
         cursor="hand2",
         command=play_sound
-    )
-    test_btn.pack(anchor="w")
+    ).pack(anchor="w")
 
-    c_multitrack = make_card(view_audio, "Osobne ścieżki audio (Multi-track)", "Zapisuj dźwięk z gry i mikrofon na oddzielnych ścieżkach w pliku MP4")
-    track_var = tk.BooleanVar(value=settings.SeparateAudioTracks)
-
-    def toggle_multitrack():
-        settings.SeparateAudioTracks = track_var.get()
-        settings.save()
-        if engine.is_recording:
-            engine.stop()
-            engine.start()
-
-    track_chk = tk.Checkbutton(
-        c_multitrack,
-        text="Włącz Multi-track (ścieżka 1: Gra/System, ścieżka 2: Mikrofon)",
-        variable=track_var,
-        font=("Segoe UI", 10),
-        bg=current_theme["card"],
-        fg=current_theme["text"],
-        selectcolor=current_theme["pill_bg"],
-        activebackground=current_theme["card"],
-        activeforeground=current_theme["text"],
-        command=toggle_multitrack
-    )
-    track_chk.pack(anchor="w")
-
-    # 4. VIEW: HOTKEYS
-    view_hotkeys = tk.Frame(content_container, bg=current_theme["bg"])
+    # =========================================================================
+    # TAB 4: HOTKEYS (SKRÓTY KLAWISZOWE)
+    # =========================================================================
+    view_hotkeys = tk.Frame(views_container, bg=C["bg"])
     content_frames["hotkeys"] = view_hotkeys
 
-    c_hotkey = make_card(view_hotkeys, "Główny skrót klawiszowy", "Klawisz wyzwalający natychmiastowy zapis powtórki")
-    hotkey_frame = tk.Frame(c_hotkey, bg=current_theme["card"])
-    hotkey_frame.pack(anchor="w")
+    # Primary Hotkey
+    c_hk1 = create_card(view_hotkeys, "Główny skrót powtórki", "Klawisz wyzwalający natychmiastowy zapis powtórki")
+    hk1_frame = tk.Frame(c_hk1, bg=C["card"])
+    hk1_frame.pack(anchor="w")
 
-    for k in ["F7", "F8", "F9", "F10", "F11", "F12"]:
-        b = tk.Button(
-            hotkey_frame,
-            text=k,
-            font=("Segoe UI", 9, "bold" if settings.Hotkey == k else "normal"),
-            bg=current_theme["pill_active"] if settings.Hotkey == k else current_theme["pill_bg"],
-            fg="#FFFFFF" if settings.Hotkey == k else current_theme["text"],
-            bd=0,
-            padx=10,
-            pady=4,
-            cursor="hand2",
-            command=lambda val=k: set_hotkey(val)
-        )
-        b.pack(side="left", padx=3)
-
-    def set_hotkey(k):
+    def on_set_hk(k):
         settings.Hotkey = k
         settings.save()
         hero_hotkey_badge.config(text=f"[{k}]")
-        switch_tab("hotkeys")
+        status_sub_lbl.config(text=f"{k} • {settings.ClipDuration}s • {settings.Fps} FPS")
 
-    c_sec_hotkey = make_card(view_hotkeys, "Drugi skrót (Długi klip)", "Dodatkowy skrót do zapisu dłuższej powtórki (np. całej rundy)")
+    setup_pill_group(hk1_frame, ["F7", "F8", "F9", "F10", "F11", "F12"], settings.Hotkey, on_set_hk)
+
+    # Secondary Hotkey (Long Clips)
+    c_hk2 = create_card(view_hotkeys, "Drugi skrót (Długie powtórki)", "Niezależny skrót do rejestrowania dłuższych fragmentów (np. całej rundy gry)")
     sec_var = tk.BooleanVar(value=settings.SecondaryHotkeyEnabled)
 
-    def toggle_sec_hotkey():
+    def on_toggle_sec():
         settings.SecondaryHotkeyEnabled = sec_var.get()
         settings.save()
-        switch_tab("hotkeys")
 
     sec_chk = tk.Checkbutton(
-        c_sec_hotkey,
+        c_hk2,
         text="Włącz drugi skrót klawiszowy",
         variable=sec_var,
-        font=("Segoe UI", 10),
-        bg=current_theme["card"],
-        fg=current_theme["text"],
-        selectcolor=current_theme["pill_bg"],
-        activebackground=current_theme["card"],
-        activeforeground=current_theme["text"],
-        command=toggle_sec_hotkey
+        font=fnt(10),
+        bg=C["card"],
+        fg=C["text"],
+        selectcolor=C["pill_bg"],
+        activebackground=C["card"],
+        activeforeground=C["text"],
+        command=on_toggle_sec
     )
     sec_chk.pack(anchor="w", pady=(0, 6))
 
-    sec_keys_frame = tk.Frame(c_sec_hotkey, bg=current_theme["card"])
-    sec_keys_frame.pack(anchor="w", pady=(0, 6))
+    hk2_frame = tk.Frame(c_hk2, bg=C["card"])
+    hk2_frame.pack(anchor="w", pady=(0, 6))
 
-    for k in ["F7", "F8", "F9", "F10", "F11", "F12"]:
-        b = tk.Button(
-            sec_keys_frame,
-            text=k,
-            font=("Segoe UI", 9, "bold" if settings.SecondaryHotkey == k else "normal"),
-            bg=current_theme["pill_active"] if settings.SecondaryHotkey == k else current_theme["pill_bg"],
-            fg="#FFFFFF" if settings.SecondaryHotkey == k else current_theme["text"],
-            bd=0,
-            padx=10,
-            pady=4,
-            cursor="hand2",
-            command=lambda val=k: set_sec_hotkey(val)
-        )
-        b.pack(side="left", padx=3)
-
-    def set_sec_hotkey(k):
+    def on_set_sec_hk(k):
         settings.SecondaryHotkey = k
         settings.save()
-        switch_tab("hotkeys")
 
-    tk.Label(c_sec_hotkey, text="Długość drugiej powtórki:", font=("Segoe UI", 9), fg=current_theme["text_muted"], bg=current_theme["card"]).pack(anchor="w", pady=(4, 2))
-    sec_dur_frame = tk.Frame(c_sec_hotkey, bg=current_theme["card"])
+    setup_pill_group(hk2_frame, ["F7", "F8", "F9", "F10", "F11", "F12"], settings.SecondaryHotkey, on_set_sec_hk)
+
+    tk.Label(c_hk2, text="Czas trwania drugiej powtórki:", font=fnt(9), fg=C["text_secondary"], bg=C["card"]).pack(anchor="w", pady=(4, 2))
+    sec_dur_frame = tk.Frame(c_hk2, bg=C["card"])
     sec_dur_frame.pack(anchor="w")
 
-    for d in [60, 120, 180, 300]:
-        b = tk.Button(
-            sec_dur_frame,
-            text=f"{d}s",
-            font=("Segoe UI", 9, "bold" if settings.SecondaryClipDuration == d else "normal"),
-            bg=current_theme["pill_active"] if settings.SecondaryClipDuration == d else current_theme["pill_bg"],
-            fg="#FFFFFF" if settings.SecondaryClipDuration == d else current_theme["text"],
+    def on_set_sec_dur(d):
+        settings.SecondaryClipDuration = d
+        settings.save()
+
+    setup_pill_group(sec_dur_frame, [60, 120, 180, 300], settings.SecondaryClipDuration, on_set_sec_dur)
+
+    # Wayland Hint Card
+    create_card(
+        view_hotkeys,
+        "Środowiska Wayland (GNOME / KDE Plasma / Hyprland / Sway)",
+        "Dla 100% niezawodności w grach natywnych Wayland, przypisz skrót w Ustawieniach Systemowych -> Klawiatura do polecenia:\n• rewind --save (główny klip)\n• rewind --save-long (długi klip)"
+    )
+
+    # =========================================================================
+    # TAB 5: SETTINGS (USTAWIENIA)
+    # =========================================================================
+    view_settings = tk.Frame(views_container, bg=C["bg"])
+    content_frames["settings"] = view_settings
+
+    # Theme Selector
+    c_theme = create_card(view_settings, "Motyw interfejsu", "Wybierz schemat kolorystyczny aplikacji")
+    theme_frame = tk.Frame(c_theme, bg=C["card"])
+    theme_frame.pack(anchor="w")
+
+    def on_set_theme(th):
+        settings.Theme = th
+        settings.save()
+        messagebox.showinfo("Rewind", "Zmieniono motyw. Zostanie w pełni zastosowany po ponownym uruchomieniu programu.")
+
+    setup_pill_group(theme_frame, ["Dark", "Light"], settings.Theme, on_set_theme)
+
+    # Language Selector
+    c_lang = create_card(view_settings, "Język / Language", "Wybierz język interfejsu programu")
+    lang_frame = tk.Frame(c_lang, bg=C["card"])
+    lang_frame.pack(anchor="w")
+
+    def on_set_lang(l_code):
+        settings.Language = l_code
+        settings.save()
+
+    lang_labels = {"pl": "🇵🇱 Polski", "en": "🇬🇧 English", "de": "🇩🇪 Deutsch", "es": "🇪🇸 Español", "fr": "🇫🇷 Français", "ua": "🇺🇦 Українська"}
+    for l_c, l_name in lang_labels.items():
+        is_l_act = (settings.Language == l_c)
+        l_btn = tk.Button(
+            lang_frame,
+            text=l_name,
+            font=fnt(9, "bold" if is_l_act else "normal"),
+            fg="#FFFFFF" if is_l_act else C["text_secondary"],
+            bg=C["pill_active"] if is_l_act else C["pill_bg"],
             bd=0,
             padx=10,
             pady=4,
             cursor="hand2",
-            command=lambda val=d: set_sec_dur(val)
+            command=lambda c=l_c: on_set_lang(c)
         )
-        b.pack(side="left", padx=3)
+        l_btn.pack(side="left", padx=2)
 
-    def set_sec_dur(d):
-        settings.SecondaryClipDuration = d
-        settings.save()
-        switch_tab("hotkeys")
-
-    c_wayland = make_card(
-        view_hotkeys,
-        "Wskazówka dla środowisk Wayland (GNOME / KDE / Sway)",
-        "Na Waylandzie możesz przypisać dowolne skróty w Ustawieniach Systemowych -> Skróty klawiszowe do poleceń:\n• Zwykły klip: rewind --save\n• Długi klip: rewind --save-long"
-    )
-
-    # 5. VIEW: SETTINGS
-    view_settings = tk.Frame(content_container, bg=current_theme["bg"])
-    content_frames["settings"] = view_settings
-
-    c_adv = make_card(view_settings, "Tryb zaawansowany", "Odblokowuje precyzyjne pola wpisywania wartości parametrów")
+    # Advanced Mode Toggle
+    c_adv = create_card(view_settings, "Tryb zaawansowany (Creator Mode)", "Odblokowuje suwaki wzmocnienia głośności do 1000% oraz zaawansowane parametry")
     adv_var = tk.BooleanVar(value=settings.AdvancedMode)
 
-    def toggle_adv():
+    def on_toggle_adv():
         settings.AdvancedMode = adv_var.get()
         settings.save()
-        update_audio_controls()
+        sys_slider.config(to=1000 if settings.AdvancedMode else 150)
+        mic_slider.config(to=1000 if settings.AdvancedMode else 150)
 
     adv_chk = tk.Checkbutton(
         c_adv,
-        text="Włącz tryb zaawansowany",
+        text="Włącz tryb zaawansowany (do 1000% głośności)",
         variable=adv_var,
-        font=("Segoe UI", 10),
-        bg=current_theme["card"],
-        fg=current_theme["text"],
-        selectcolor=current_theme["pill_bg"],
-        activebackground=current_theme["card"],
-        activeforeground=current_theme["text"],
-        command=toggle_adv
+        font=fnt(10),
+        bg=C["card"],
+        fg=C["text"],
+        selectcolor=C["pill_bg"],
+        activebackground=C["card"],
+        activeforeground=C["text"],
+        command=on_toggle_adv
     )
     adv_chk.pack(anchor="w")
 
-    c_storage = make_card(view_settings, "Zarządzanie miejscem na dysku", "Automatyczne pilnowanie wolnej przestrzeni na dysku z powtórkami")
+    # Storage Quota Management
+    c_stor = create_card(view_settings, "Zarządzanie przestrzenią dyskową", "Automatyczne pilnowanie limitu miejsca i usuwanie starych klipów")
     stor_var = tk.BooleanVar(value=settings.StorageLimitEnabled)
 
-    def toggle_storage():
+    def on_toggle_stor():
         settings.StorageLimitEnabled = stor_var.get()
         settings.save()
         if settings.StorageLimitEnabled:
             engine.enforce_storage_limits()
             refresh_clips_list()
-        switch_tab("settings")
 
     stor_chk = tk.Checkbutton(
-        c_storage,
-        text="Ogranicz rozmiar folderu powtórek",
+        c_stor,
+        text="Włącz automatyczne zarządzanie miejscem na dysku",
         variable=stor_var,
-        font=("Segoe UI", 10),
-        bg=current_theme["card"],
-        fg=current_theme["text"],
-        selectcolor=current_theme["pill_bg"],
-        activebackground=current_theme["card"],
-        activeforeground=current_theme["text"],
-        command=toggle_storage
+        font=fnt(10),
+        bg=C["card"],
+        fg=C["text"],
+        selectcolor=C["pill_bg"],
+        activebackground=C["card"],
+        activeforeground=C["text"],
+        command=on_toggle_stor
     )
     stor_chk.pack(anchor="w", pady=(0, 6))
 
-    tk.Label(c_storage, text="Maksymalny łączny rozmiar folderu z powtórkami:", font=("Segoe UI", 9), fg=current_theme["text_muted"], bg=current_theme["card"]).pack(anchor="w", pady=(4, 2))
-    gb_frame = tk.Frame(c_storage, bg=current_theme["card"])
+    tk.Label(c_stor, text="Limit rozmiaru folderu powtórek:", font=fnt(9), fg=C["text_secondary"], bg=C["card"]).pack(anchor="w", pady=(4, 2))
+    gb_frame = tk.Frame(c_stor, bg=C["card"])
     gb_frame.pack(anchor="w", pady=(0, 6))
 
-    for g in [10, 25, 50, 100]:
-        b = tk.Button(
-            gb_frame,
-            text=f"{g} GB",
-            font=("Segoe UI", 9, "bold" if settings.MaxStorageLimitGB == g else "normal"),
-            bg=current_theme["pill_active"] if settings.MaxStorageLimitGB == g else current_theme["pill_bg"],
-            fg="#FFFFFF" if settings.MaxStorageLimitGB == g else current_theme["text"],
-            bd=0,
-            padx=10,
-            pady=4,
-            cursor="hand2",
-            command=lambda val=g: set_storage_gb(val)
-        )
-        b.pack(side="left", padx=3)
-
-    def set_storage_gb(g):
+    def on_set_gb(g):
         settings.MaxStorageLimitGB = g
         settings.save()
         if settings.StorageLimitEnabled:
             engine.enforce_storage_limits()
             refresh_clips_list()
-        switch_tab("settings")
 
-    tk.Label(c_storage, text="Automatyczne usuwanie starych klipów:", font=("Segoe UI", 9), fg=current_theme["text_muted"], bg=current_theme["card"]).pack(anchor="w", pady=(4, 2))
-    age_frame = tk.Frame(c_storage, bg=current_theme["card"])
-    age_frame.pack(anchor="w")
+    setup_pill_group(gb_frame, [10, 25, 50, 100], settings.MaxStorageLimitGB, on_set_gb)
 
-    for a in [0, 7, 14, 30, 60]:
-        label_a = "Wyłączone" if a == 0 else f"{a} dni"
-        b = tk.Button(
-            age_frame,
-            text=label_a,
-            font=("Segoe UI", 9, "bold" if settings.MaxClipAgeDays == a else "normal"),
-            bg=current_theme["pill_active"] if settings.MaxClipAgeDays == a else current_theme["pill_bg"],
-            fg="#FFFFFF" if settings.MaxClipAgeDays == a else current_theme["text"],
-            bd=0,
-            padx=10,
-            pady=4,
-            cursor="hand2",
-            command=lambda val=a: set_storage_age(val)
-        )
-        b.pack(side="left", padx=3)
-
-    def set_storage_age(a):
-        settings.MaxClipAgeDays = a
-        settings.save()
-        if a > 0 or settings.StorageLimitEnabled:
-            engine.enforce_storage_limits()
-            refresh_clips_list()
-        switch_tab("settings")
-
-    c_ctrl = make_card(view_settings, "Zarządzanie stanem bufora", "Wstrzymaj lub wznów rejestrowanie w tle")
-    pause_btn = tk.Button(
-        c_ctrl,
-        text="⏸ Wstrzymaj bufor" if engine.is_recording else "▶ Wznów bufor",
-        font=("Segoe UI", 9, "bold"),
-        bg=current_theme["pill_bg"],
-        fg=current_theme["text"],
-        bd=0,
-        padx=12,
-        pady=5,
-        cursor="hand2",
-        command=lambda: toggle_engine()
-    )
-    pause_btn.pack(anchor="w")
-
-    def toggle_engine():
-        if engine.is_recording:
-            engine.stop()
-            pause_btn.config(text="▶ Wznów bufor")
-        else:
-            engine.start()
-            pause_btn.config(text="⏸ Wstrzymaj bufor")
-
-    # 6. VIEW: ABOUT
-    view_about = tk.Frame(content_container, bg=current_theme["bg"])
+    # =========================================================================
+    # TAB 6: ABOUT (O PROGRAMIE)
+    # =========================================================================
+    view_about = tk.Frame(views_container, bg=C["bg"])
     content_frames["about"] = view_about
 
-    c_abt = make_card(view_about, f"Rewind {APP_VERSION}", "Lekkie narzędzie powtórek wideo na Linuksa (X11 & Wayland)")
-    tk.Label(c_abt, text="• Zużycie pamięci: ~45 MB RAM", font=("Segoe UI", 9), fg=current_theme["text_muted"], bg=current_theme["card"]).pack(anchor="w")
-    tk.Label(c_abt, text="• Format nagrywania: MPEG-TS ring buffer (2s bloki)", font=("Segoe UI", 9), fg=current_theme["text_muted"], bg=current_theme["card"]).pack(anchor="w")
-    tk.Label(c_abt, text=f"• Enkoder: {engine.encoder}", font=("Segoe UI", 9), fg=current_theme["text_muted"], bg=current_theme["card"]).pack(anchor="w")
-    tk.Label(c_abt, text="• Autor: Rewind Project (Open Source)", font=("Segoe UI", 9), fg=current_theme["text_muted"], bg=current_theme["card"]).pack(anchor="w")
+    c_info = create_card(view_about, f"Rewind {APP_VERSION} Linux Edition", "Wydajne narzędzie powtórek wideo dla systemów Linux (X11 & Wayland)")
+    tk.Label(c_info, text=f"• Sprzętowy enkoder: {engine.encoder.upper()}", font=fnt(9), fg=C["text_secondary"], bg=C["card"]).pack(anchor="w", pady=2)
+    tk.Label(c_info, text="• Format bufora: Ring buffer MPEG-TS (2-sekundowe bloki w pamięci RAM/tmp)", font=fnt(9), fg=C["text_secondary"], bg=C["card"]).pack(anchor="w", pady=2)
+    tk.Label(c_info, text="• Zużycie zasobów: ~40 MB RAM, zerowy narzut CPU przy akceleracji GPU", font=fnt(9), fg=C["text_secondary"], bg=C["card"]).pack(anchor="w", pady=2)
+    tk.Label(c_info, text="• Dźwięk: PipeWire / PulseAudio z mikserem do 1000% wzmocnienia", font=fnt(9), fg=C["text_secondary"], bg=C["card"]).pack(anchor="w", pady=2)
+    tk.Label(c_info, text="• Projekt: Open Source (GitHub: qavi999/Rewind)", font=fnt(9), fg=C["text_secondary"], bg=C["card"]).pack(anchor="w", pady=2)
 
-    # Default to Clips tab
+    # 3. Subtle Footer Bar
+    footer_bar = tk.Frame(right_panel, bg=C["bg"], height=28)
+    footer_bar.grid(row=2, column=0, sticky="ew", padx=24, pady=(2, 8))
+
+    tk.Label(
+        footer_bar,
+        text=f"⚡ {engine.encoder.upper()} Hardware Acceleration • PipeWire High Definition Audio",
+        font=fnt(8),
+        fg=C["text_muted"],
+        bg=C["bg"]
+    ).pack(side="left")
+
+    tk.Label(
+        footer_bar,
+        text="Esc - Zminimalizuj",
+        font=fnt(8),
+        fg=C["text_muted"],
+        bg=C["bg"]
+    ).pack(side="right")
+
+    # Global Key Bindings
+    root.bind("<Escape>", lambda e: root.iconify())
+
+    # Switch to initial tab
     switch_tab("clips")
 
-    # Start buffer on GUI launch if enabled
+    # Start buffer on launch if configured
     if settings.BufferActive and not engine.is_recording:
-        engine.start()
+        threading.Thread(target=engine.start, daemon=True).start()
 
-    # Window close handler
     def on_closing():
-        # Keep engine running in daemon if minimized, or close
         root.destroy()
 
     root.protocol("WM_DELETE_WINDOW", on_closing)

@@ -16,11 +16,11 @@ Błyskawiczne nagrywanie powtórek w buforze kołowym (Instant Replay) dla syste
    tar -xzf Rewind-v0.2-Linux.tar.gz
    cd Rewind-v0.2-Linux
    ```
-2. Kliknij dwukrotnie plik **`RewindSetup`** w menedżerze plików lub uruchom w terminalu:
+2. Kliknij dwukrotnie plik **`Zainstaluj Rewind`** (`Rewind-Installer.desktop`) lub **`RewindSetup`** w menedżerze plików, albo wpisz w terminalu (bez sudo):
    ```bash
-   ./RewindSetup
+   ./install.sh
    ```
-   *(Możesz również uruchomić `./install.sh`, który automatycznie otworzy instalator okienkowy).*
+   *(Możesz również uruchomić `./RewindSetup` bezpośrednio – okno instalatora otworzy się natychmiast).*
 
 3. W oknie instalatora wybierz język, folder docelowy oraz opcje skrótów i kliknij **„Zainstaluj Rewind”**. Program natychmiast utworzy skróty i uruchomi aplikację.
 

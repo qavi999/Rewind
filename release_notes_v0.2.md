@@ -6,16 +6,23 @@
 
 ## ⚡ What's New in v0.2
 
-### 🐧 Cross-Platform Linux Hardening & Architecture
-- **Watchdog Deadlock Prevention:** Upgraded buffer locking to re-entrant `threading.RLock()`, guaranteeing flawless crash recovery without deadlocks.
-- **Clean Ring Buffer Truncation:** Excluded active recording segments during export to ensure MP4 clips have 100% valid PTS/DTS timestamps and zero corrupt endings.
-- **Multi-Track Audio Concat:** Added full `-map 0` stream mapping so both system audio (Track 1) and microphone (Track 2) are preserved in output clips.
-- **Resilient Audio Source Validation:** Gracefully falls back to system audio if microphone is disconnected or unavailable instead of failing the recording.
-- **Hardware Acceleration Parity:** Clean encoder pipelines for NVENC (`h264_nvenc`), Intel QSV (`h264_qsv`), VAAPI (`h264_vaapi`), and CPU (`libx264`).
-- **Secure Runtime IPC:** Shifted IPC sockets to isolated `$XDG_RUNTIME_DIR` (`0o600` permissions) with automatic headless daemon takeover when opening the GUI.
-- **X11 Hotkey Safety:** Installed custom `XSetErrorHandler` to safely handle `BadAccess` key conflicts without process termination.
-- **Asynchronous UI Trimmer:** Clip trimming runs in background worker threads, keeping Tkinter UI 100% responsive.
-- **Root Pollution Prevention:** `install.sh` and `uninstall.sh` automatically detect `sudo` execution and run in user context without polluting `/root/`.
+### 🐧 Linux UI & Engine Transformation (Pure Jet Black Parity)
+- **Visual Design Parity with Windows:** Redesigned Linux UI to match the Windows Raycast aesthetic down to the pixel:
+  - Deep Jet Black canvas (`#0A0A0A`), sleek sidebar (`#0F0F0F`), and subtle cards (`#121214`) with 1px borders (`#1E1E24`) and Electric Coral Red (`#FF5757`).
+  - Automatic modern antialiased typography detection (`Inter`, `Roboto`, `Ubuntu`, `Cantarell`, `DejaVu Sans`).
+  - Breadcrumb header bar with minimize (`—`) and close (`✕`) buttons.
+  - Discreet toast notifications for saved clips with quick play and folder links.
+  - **Double-Click Preview:** Double-clicking any card immediately launches the clip in your default Linux media player.
+  - **Delete Key Shortcut:** Press `Delete` on selected cards to quickly remove clips.
+- **100% Non-Blocking Responsiveness:**
+  - Decoupled all UI actions (`FPS`, `Bitrate`, `Duration`, `Volume`, `Buffer Toggle`) from blocking process operations.
+  - In-place instant pill transitions with zero tab flickering or delays.
+  - Background asynchronous clip trimmer with live progress state.
+  - Watchdog logging to `~/.config/rewind/ffmpeg.log` with retry backoff to eliminate any CPU freezing or UI stutter.
+- **Graphical Windowed Setup (`RewindSetup`):**
+  - Standalone installer executable with dark theme, real-time 6-language switcher, directory selector, and desktop shortcuts.
+  - Added `Rewind-Installer.desktop` allowing direct double-click installation from graphical file managers (GNOME Files, Dolphin, Thunar).
+  - Robust display auto-detection (`DISPLAY` and `WAYLAND_DISPLAY`) even when executed through `sudo`.
 
 ### 🎯 Secondary Hotkey (Long Clips)
 - Added an independent secondary hotkey (e.g. `F7`, `F11`, `Alt+F8`) with dedicated duration (60s, 120s, 180s, 300s).
@@ -37,10 +44,8 @@
 - Set maximum folder size limits (10 GB, 25 GB, 50 GB, 100 GB) to prevent storage exhaustion.
 - Automatic retention policy: automatically clean clips older than 7, 14, 30, or 60 days.
 
-### 🎨 UX & Accessibility Polish
-- **Double-Click Preview:** Double-clicking any card in the clips library immediately plays the clip in your default media player.
-- **Full 6-Language Localization:** Polish, English, German, Spanish, French, and Ukrainian.
-- **Embedded Setup Architecture:** Linux release distributes a clean standalone `RewindSetup` installer containing the embedded application payload.
+### 🎧 Multi-track Audio Channels
+- Record system audio (Track 1) and microphone (Track 2) into separate streams inside the MP4 container for independent volume leveling during post-production.
 
 ---
 
@@ -49,4 +54,4 @@
 | Asset | Platform | Description |
 |---|---|---|
 | **`RewindSetup.exe`** | Windows 10/11 | Official Windows installer (Start Menu, desktop shortcuts, Windows Search indexing, tray autostart). |
-| **`Rewind-v0.2-Linux.tar.gz`** | Linux (x86_64) | Complete Linux release package with windowed `RewindSetup` installer and launch scripts. |
+| **`Rewind-v0.2-Linux.tar.gz`** | Linux (x86_64) | Complete Linux release package with windowed `RewindSetup` installer, `Rewind-Installer.desktop`, and launch scripts. |

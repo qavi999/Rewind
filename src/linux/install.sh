@@ -7,14 +7,25 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# W-01: Prevent root pollution if user executed via `sudo ./install.sh`
-if [ "$EUID" -eq 0 ] && [ -n "$SUDO_USER" ]; then
-    echo "[Rewind] Wykryto uruchomienie z uprawnieniami roota przez sudo."
-    echo "[Rewind] Uruchamianie instalatora w kontekście użytkownika $SUDO_USER..."
-    exec sudo -u "$SUDO_USER" "$0" "$@"
+# Auto-detect display if not exported (e.g. running from basic terminal or file manager)
+if [ -z "$DISPLAY" ] && [ -z "$WAYLAND_DISPLAY" ]; then
+    for x_num in 0 1 2; do
+        if [ -e "/tmp/.X11-unix/X$x_num" ]; then
+            export DISPLAY=":$x_num"
+            break
+        fi
+    done
 fi
 
-# W-09: Verify tkinter availability on Debian/Ubuntu/Fedora/Arch
+# If executed via sudo, preserve user display environment and run in user's graphical context
+if [ "$EUID" -eq 0 ] && [ -n "$SUDO_USER" ]; then
+    USER_HOME=$(getent passwd "$SUDO_USER" | cut -d: -f6)
+    export XAUTHORITY="${XAUTHORITY:-$USER_HOME/.Xauthority}"
+    export DISPLAY="${DISPLAY:-:0}"
+    exec sudo -E -u "$SUDO_USER" env "DISPLAY=$DISPLAY" "XAUTHORITY=$XAUTHORITY" "WAYLAND_DISPLAY=$WAYLAND_DISPLAY" "HOME=$USER_HOME" "$0" "$@"
+fi
+
+# Verify tkinter availability on Debian/Ubuntu/Fedora/Arch
 if ! python3 -c "import tkinter" &>/dev/null; then
     echo -e "\033[0;33m[Rewind] Uwaga: W systemie nie wykryto modułu python3-tk (wymaganego do okna GUI instalatora).\033[0m"
     if command -v apt-get &>/dev/null; then
@@ -24,7 +35,7 @@ if ! python3 -c "import tkinter" &>/dev/null; then
     elif command -v pacman &>/dev/null; then
         echo "[Rewind] Możesz go zainstalować poleceniem: sudo pacman -S --noconfirm tk"
     fi
-    echo "[Rewind] Próba uruchomienia w trybie graficznym lub automatyczny fallback CLI..."
+    echo "[Rewind] Próba otwarcia okna instalatora graficznego..."
 fi
 
 if [ -f "$SCRIPT_DIR/RewindSetup" ]; then

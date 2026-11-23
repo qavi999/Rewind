@@ -173,8 +173,12 @@ if ($LASTEXITCODE -eq 0 -and (Test-Path "$buildDir\Rewind.exe")) {
         Copy-Item (Join-Path $srcLinux "install.sh") (Join-Path $subPackDir "install.sh") -Force
         Copy-Item (Join-Path $srcLinux "uninstall.sh") (Join-Path $subPackDir "uninstall.sh") -Force
         Copy-Item (Join-Path $srcLinux "README.md") (Join-Path $subPackDir "README.md") -Force
+        $desktopLauncher = Join-Path $srcLinux "Rewind-Installer.desktop"
+        if (Test-Path $desktopLauncher) {
+            Copy-Item $desktopLauncher (Join-Path $subPackDir "Rewind-Installer.desktop") -Force
+        }
 
-        foreach ($fName in @("install.sh", "uninstall.sh", "RewindSetup")) {
+        foreach ($fName in @("install.sh", "uninstall.sh", "RewindSetup", "Rewind-Installer.desktop")) {
             $fPath = Join-Path $subPackDir $fName
             if (Test-Path $fPath) {
                 $txt = [System.IO.File]::ReadAllText($fPath).Replace("`r`n", "`n")
